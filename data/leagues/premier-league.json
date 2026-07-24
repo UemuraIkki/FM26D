@@ -1,0 +1,27 @@
+{
+  "id": "ENG1",
+  "name": "Premier League",
+  "country": "England",
+  "clubs": [
+    { "id": "ARS", "name": "Arsenal", "shortName": "Arsenal", "strength": 88 },
+    { "id": "AVL", "name": "Aston Villa", "shortName": "Villa", "strength": 79 },
+    { "id": "BOU", "name": "AFC Bournemouth", "shortName": "Bournemouth", "strength": 74 },
+    { "id": "BRE", "name": "Brentford", "shortName": "Brentford", "strength": 73 },
+    { "id": "BHA", "name": "Brighton & Hove Albion", "shortName": "Brighton", "strength": 77 },
+    { "id": "BUR", "name": "Burnley", "shortName": "Burnley", "strength": 65 },
+    { "id": "CHE", "name": "Chelsea", "shortName": "Chelsea", "strength": 85 },
+    { "id": "CRY", "name": "Crystal Palace", "shortName": "Palace", "strength": 76 },
+    { "id": "EVE", "name": "Everton", "shortName": "Everton", "strength": 72 },
+    { "id": "FUL", "name": "Fulham", "shortName": "Fulham", "strength": 74 },
+    { "id": "LEE", "name": "Leeds United", "shortName": "Leeds", "strength": 68 },
+    { "id": "LIV", "name": "Liverpool", "shortName": "Liverpool", "strength": 89 },
+    { "id": "MCI", "name": "Manchester City", "shortName": "Man City", "strength": 88 },
+    { "id": "MUN", "name": "Manchester United", "shortName": "Man Utd", "strength": 80 },
+    { "id": "NEW", "name": "Newcastle United", "shortName": "Newcastle", "strength": 81 },
+    { "id": "NFO", "name": "Nottingham Forest", "shortName": "Forest", "strength": 76 },
+    { "id": "SUN", "name": "Sunderland", "shortName": "Sunderland", "strength": 66 },
+    { "id": "TOT", "name": "Tottenham Hotspur", "shortName": "Spurs", "strength": 80 },
+    { "id": "WHU", "name": "West Ham United", "shortName": "West Ham", "strength": 72 },
+    { "id": "WOL", "name": "Wolverhampton Wanderers", "shortName": "Wolves", "strength": 70 }
+  ]
+}
