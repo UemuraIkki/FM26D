@@ -130,7 +130,9 @@ export class TransferMarket {
 
       // 5. Execute: fee through the ledger, move, fresh contract.
       if (listing) {
-        this.world.ledger.record(date, "TRANSFER_FEE", clubId, listing.sellerId, choice.offeredFee, player.id);
+        if (choice.offeredFee > 0) {
+          this.world.ledger.record(date, "TRANSFER_FEE", clubId, listing.sellerId, choice.offeredFee, player.id);
+        }
         listings.delete(player.id);
       }
       const fromClubId = player.clubId;

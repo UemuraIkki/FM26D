@@ -42,6 +42,15 @@ function commandSeason(): void {
   const stats = computeCalibration(report.matches);
   console.log(`\nGoals/match: ${stats.goalsPerMatch.toFixed(2)}  Pass%: ${pct(stats.passSuccessRate)}  Shots/team: ${stats.shotsPerTeamPerMatch.toFixed(1)}`);
   console.log(`Home/Draw/Away: ${pct(stats.homeWinRate)} / ${pct(stats.drawRate)} / ${pct(stats.awayWinRate)}  (home adv: ${pct(stats.homeAdvantage)})`);
+
+  console.log(`\n=== Transfers (${report.transfers.length}) ===`);
+  for (const t of report.transfers) {
+    const fee = t.fee > 0 ? `£${t.fee.toFixed(1)}M` : "free";
+    console.log(`${t.date}  ${t.playerName.padEnd(24)} ${(t.fromClubId ?? "FA").padEnd(4)} -> ${t.toClubId.padEnd(4)} ${fee}`);
+  }
+  console.log(`\nContracts: ${report.contractSummary.renewed} renewed, ${report.contractSummary.released} released to free agency`);
+  const drift = world.ledger.conservationDrift();
+  console.log(`Money conservation drift: ${drift} (must be 0)`);
 }
 
 function commandCalibrate(): void {
