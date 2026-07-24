@@ -14,6 +14,7 @@ import {
 import { StandingsTable } from "../league/standings.js";
 import { getRoleBook, type RoleBook } from "../model/roles.js";
 import { getSquad, type World } from "../model/world.js";
+import { applyMatchMorale, applyMoraleToSheet, moraleDailyTick } from "../morale/morale.js";
 import { fixturesByDate, generateSeasonFixtures, type Fixture } from "../schedule/fixtures.js";
 import { TransferMarket, type RefusalRecord, type TransferRecord } from "../transfer/market.js";
 
@@ -102,6 +103,7 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
   let day: SimDate = { year: startYear, month: 7, day: 1 };
   const broadcastDay = toIso({ year: startYear, month: 8, day: 1 });
   while (compareDates(day, lastDate) <= 0) {
+    moraleDailyTick(world);
     payMonthlyWages(world, day, clubIds);
     if (toIso(day) === broadcastDay) payBroadcastBase(world, day, clubIds);
     if (transfersEnabled) market.processDay(day, clubIds);
@@ -113,9 +115,18 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
         const home = brains.get(fixture.homeClubId)!.selectLineup({ ...context, squad: getSquad(world, fixture.homeClubId) });
         const away = brains.get(fixture.awayClubId)!.selectLineup({ ...context, squad: getSquad(world, fixture.awayClubId) });
         const rng = deriveRng(world.seed, `match:${fixture.id}`);
-        const result = simulateMatch(home, away, rng, options.engineParams);
+        // Morale scales match-day ability, capped at ±5% (requirement 4.7).
+        const result = simulateMatch(
+          applyMoraleToSheet(world, home),
+          applyMoraleToSheet(world, away),
+          rng,
+          options.engineParams,
+        );
         table.record(fixture.homeClubId, fixture.awayClubId, result.homeGoals, result.awayGoals);
         payTicketIncome(world, day, fixture.homeClubId);
+        const homeOutcome = result.homeGoals > result.awayGoals ? "WIN" : result.homeGoals < result.awayGoals ? "LOSS" : "DRAW";
+        applyMatchMorale(world, fixture.homeClubId, home, homeOutcome);
+        applyMatchMorale(world, fixture.awayClubId, away, homeOutcome === "WIN" ? "LOSS" : homeOutcome === "LOSS" ? "WIN" : "DRAW");
         const played = { fixture, result };
         if (options.keepMatches !== false) matches.push(played);
         options.onMatch?.(played);

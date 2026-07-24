@@ -4,6 +4,7 @@ import type { ClubDecisionMaker, SquadContext } from "../decision/clubDecisionMa
 import type { StandingRow } from "../league/standings.js";
 import type { Formation, RoleBook } from "../model/roles.js";
 import { getSquad, releasePlayer, type World } from "../model/world.js";
+import { applyRenewalMorale } from "../morale/morale.js";
 import { WORLD_ACCOUNT } from "./ledger.js";
 import { playerAbility, wageFor } from "./value.js";
 import { contractYearsFor } from "../transfer/market.js";
@@ -86,6 +87,7 @@ export function processContractExpiries(
           annualWage: wageFor(playerAbility(player)),
           endYear: seasonEndYear + contractYearsFor(player.age),
         };
+        applyRenewalMorale(world, player.id);
         renewed++;
       } else {
         releasePlayer(world, player.id);

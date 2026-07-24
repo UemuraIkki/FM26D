@@ -7,6 +7,7 @@ import { marketValue, playerAbility, wageFor } from "../finance/value.js";
 import type { Formation, RoleBook } from "../model/roles.js";
 import type { Player } from "../model/types.js";
 import { getSquad, transferPlayer, type World } from "../model/world.js";
+import { applyTransferMorale } from "../morale/morale.js";
 import { buildDepthChart, rankIn, type ClubDepthChart, type SquadRank } from "../squad/depthChart.js";
 
 /**
@@ -197,6 +198,7 @@ export class TransferMarket {
       }
       pool.delete(player.id);
       transferPlayer(this.world, player.id, clubId);
+      applyTransferMorale(this.world, player.id, entry.sellerId, clubId);
       player.contract = {
         annualWage: Math.round(proposal.offeredWage * 100) / 100,
         endYear: this.seasonEndYear + contractYearsFor(player.age),

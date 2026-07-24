@@ -1,6 +1,7 @@
 import { deriveRng } from "../core/rng.js";
 import { Ledger } from "../finance/ledger.js";
 import { playerAbility, wageFor } from "../finance/value.js";
+import type { PlayerMorale } from "../morale/morale.js";
 import { loadLeague } from "./loader.js";
 import { generateSquad } from "./playerGen.js";
 import type { Club, LeagueData, Player } from "./types.js";
@@ -28,6 +29,10 @@ export interface World {
   freeAgents: Player[];
   /** All money movement (requirement 5.1); one account per club. */
   ledger: Ledger;
+  /** Morale state per player (requirement 4.7). */
+  moraleByPlayer: Map<string, PlayerMorale>;
+  /** Team atmosphere per club, 0-100 (requirement 4.7). */
+  atmosphereByClub: Map<string, number>;
   /** Calendar year world creation; used to seed contract end-years. */
   foundedYear: number;
 }
@@ -38,6 +43,8 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
   const players: Player[] = [];
   const playersByClub = new Map<string, Player[]>();
   const ledger = new Ledger();
+  const moraleByPlayer = new Map<string, PlayerMorale>();
+  const atmosphereByClub = new Map<string, number>();
 
   for (const path of leaguePaths) {
     const league = loadLeague(path);
@@ -47,20 +54,39 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
       clubsById.set(club.id, club);
       const squad = generateSquad(seed, club);
       const contractRng = deriveRng(seed, `contracts:${club.id}`);
+      const moraleRng = deriveRng(seed, `morale:${club.id}`);
       for (const player of squad) {
         player.contract = {
           annualWage: wageFor(playerAbility(player)),
           endYear: foundedYear + contractRng.int(1, 4),
         };
+        moraleByPlayer.set(player.id, {
+          morale: 55 + moraleRng.int(0, 15),
+          satisfaction: 55 + moraleRng.int(0, 10),
+          trust: 50 + moraleRng.int(0, 10),
+          benchStreak: 0,
+        });
       }
       players.push(...squad);
       playersByClub.set(club.id, squad);
+      atmosphereByClub.set(club.id, 55 + deriveRng(seed, `atmosphere:${club.id}`).int(0, 10));
       // Initial cash reserves scale with club stature.
       ledger.openAccount(club.id, Math.round(20 + club.strength * 1.5));
     }
   }
 
-  return { seed, leagues, clubsById, players, playersByClub, freeAgents: [], ledger, foundedYear };
+  return {
+    seed,
+    leagues,
+    clubsById,
+    players,
+    playersByClub,
+    freeAgents: [],
+    ledger,
+    moraleByPlayer,
+    atmosphereByClub,
+    foundedYear,
+  };
 }
 
 export function getSquad(world: World, clubId: string): readonly Player[] {
