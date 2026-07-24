@@ -1,0 +1,29 @@
+{
+  "id": "ITA1",
+  "name": "Serie A",
+  "country": "Italy",
+  "valueCoefficient": 0.9,
+  "broadcastBase": 50,
+  "clubs": [
+    { "id": "INT", "name": "FC Internazionale", "shortName": "Inter", "strength": 85 },
+    { "id": "NAP", "name": "SSC Napoli", "shortName": "Napoli", "strength": 83 },
+    { "id": "MIL", "name": "AC Milan", "shortName": "Milan", "strength": 80 },
+    { "id": "JUV", "name": "Juventus FC", "shortName": "Juve", "strength": 81 },
+    { "id": "ROM", "name": "AS Roma", "shortName": "Roma", "strength": 78 },
+    { "id": "LAZ", "name": "SS Lazio", "shortName": "Lazio", "strength": 76 },
+    { "id": "ATA", "name": "Atalanta BC", "shortName": "Atalanta", "strength": 79 },
+    { "id": "FIO", "name": "ACF Fiorentina", "shortName": "Fiorentina", "strength": 75 },
+    { "id": "BOL", "name": "Bologna FC", "shortName": "Bologna", "strength": 74 },
+    { "id": "TOR", "name": "Torino FC", "shortName": "Torino", "strength": 70 },
+    { "id": "UDI", "name": "Udinese Calcio", "shortName": "Udinese", "strength": 69 },
+    { "id": "GEN", "name": "Genoa CFC", "shortName": "Genoa", "strength": 68 },
+    { "id": "COM", "name": "Como 1907", "shortName": "Como", "strength": 71 },
+    { "id": "VER", "name": "Hellas Verona", "shortName": "Verona", "strength": 65 },
+    { "id": "CAG", "name": "Cagliari Calcio", "shortName": "Cagliari", "strength": 65 },
+    { "id": "PAR", "name": "Parma Calcio", "shortName": "Parma", "strength": 66 },
+    { "id": "LEC", "name": "US Lecce", "shortName": "Lecce", "strength": 64 },
+    { "id": "SAS", "name": "US Sassuolo", "shortName": "Sassuolo", "strength": 66 },
+    { "id": "PIS", "name": "Pisa SC", "shortName": "Pisa", "strength": 62 },
+    { "id": "CRE", "name": "US Cremonese", "shortName": "Cremonese", "strength": 62 }
+  ]
+}

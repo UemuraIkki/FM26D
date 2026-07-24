@@ -1,0 +1,29 @@
+{
+  "id": "ESP1",
+  "name": "La Liga",
+  "country": "Spain",
+  "valueCoefficient": 0.95,
+  "broadcastBase": 65,
+  "clubs": [
+    { "id": "RMA", "name": "Real Madrid", "shortName": "Madrid", "strength": 89 },
+    { "id": "BAR", "name": "FC Barcelona", "shortName": "Barça", "strength": 88 },
+    { "id": "ATM", "name": "Atlético de Madrid", "shortName": "Atleti", "strength": 83 },
+    { "id": "ATH", "name": "Athletic Club", "shortName": "Athletic", "strength": 79 },
+    { "id": "RSO", "name": "Real Sociedad", "shortName": "Sociedad", "strength": 76 },
+    { "id": "BET", "name": "Real Betis", "shortName": "Betis", "strength": 75 },
+    { "id": "VIL", "name": "Villarreal CF", "shortName": "Villarreal", "strength": 78 },
+    { "id": "VAL", "name": "Valencia CF", "shortName": "Valencia", "strength": 72 },
+    { "id": "SEV", "name": "Sevilla FC", "shortName": "Sevilla", "strength": 72 },
+    { "id": "CEL", "name": "RC Celta", "shortName": "Celta", "strength": 71 },
+    { "id": "OSA", "name": "CA Osasuna", "shortName": "Osasuna", "strength": 70 },
+    { "id": "GET", "name": "Getafe CF", "shortName": "Getafe", "strength": 69 },
+    { "id": "GIR", "name": "Girona FC", "shortName": "Girona", "strength": 71 },
+    { "id": "RAY", "name": "Rayo Vallecano", "shortName": "Rayo", "strength": 70 },
+    { "id": "MLL", "name": "RCD Mallorca", "shortName": "Mallorca", "strength": 69 },
+    { "id": "ALA", "name": "Deportivo Alavés", "shortName": "Alavés", "strength": 67 },
+    { "id": "ESP", "name": "RCD Espanyol", "shortName": "Espanyol", "strength": 67 },
+    { "id": "LEV", "name": "Levante UD", "shortName": "Levante", "strength": 64 },
+    { "id": "ELC", "name": "Elche CF", "shortName": "Elche", "strength": 64 },
+    { "id": "OVI", "name": "Real Oviedo", "shortName": "Oviedo", "strength": 63 }
+  ]
+}

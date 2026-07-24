@@ -1,0 +1,27 @@
+{
+  "id": "UCL",
+  "name": "UEFA Champions League",
+  "slotsPerLeague": 4,
+  "abstractClubs": [
+    { "id": "UEFA-CEL", "name": "Celtic FC", "strength": 74 },
+    { "id": "UEFA-RAN", "name": "Rangers FC", "strength": 72 },
+    { "id": "UEFA-BEN", "name": "SL Benfica", "strength": 78 },
+    { "id": "UEFA-POR", "name": "FC Porto", "strength": 77 },
+    { "id": "UEFA-SPO", "name": "Sporting CP", "strength": 78 },
+    { "id": "UEFA-AJA", "name": "AFC Ajax", "strength": 74 },
+    { "id": "UEFA-PSV", "name": "PSV Eindhoven", "strength": 76 },
+    { "id": "UEFA-FEY", "name": "Feyenoord", "strength": 73 },
+    { "id": "UEFA-GAL", "name": "Galatasaray SK", "strength": 74 },
+    { "id": "UEFA-OLY", "name": "Olympiacos FC", "strength": 70 },
+    { "id": "UEFA-RBS", "name": "FC Salzburg", "strength": 71 },
+    { "id": "UEFA-YB", "name": "BSC Young Boys", "strength": 67 }
+  ],
+  "prizes": {
+    "groupStage": 15,
+    "groupWin": 2,
+    "roundOf16": 10,
+    "quarterFinal": 11,
+    "semiFinal": 12,
+    "winner": 20
+  }
+}

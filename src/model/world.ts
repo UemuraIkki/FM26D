@@ -38,6 +38,8 @@ export interface World {
   managers: Manager[];
   /** Board confidence in the current manager per club (requirement 5.2). */
   boardConfidence: Map<string, number>;
+  /** Final club order per league from the previous season (CL qualification). */
+  lastSeasonPositions?: Map<string, string[]>;
   /** Calendar year world creation; used to seed contract end-years. */
   foundedYear: number;
 }

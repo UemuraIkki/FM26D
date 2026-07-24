@@ -60,5 +60,7 @@ export interface LeagueData {
   country: string;
   /** Market value multiplier for players in this league (PL = 1.0). */
   valueCoefficient?: number;
+  /** Season-start broadcast payment per club, 1 = £1M (PL = 100). */
+  broadcastBase?: number;
   clubs: Club[];
 }

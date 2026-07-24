@@ -15,9 +15,9 @@ import { contractYearsFor } from "../transfer/market.js";
  * conservation test can audit them.
  */
 
-/** Flat broadcast payment per club at season start (1 = £1M). */
+/** Default broadcast payment per club at season start (1 = £1M). */
 const BROADCAST_BASE = 100;
-/** Merit payment step per final position. */
+/** Merit payment step per final position, scaled by league broadcast level. */
 const MERIT_STEP = 3.9;
 
 export function payMonthlyWages(world: World, date: SimDate, clubIds: readonly string[]): void {
@@ -40,15 +40,26 @@ export function payTicketIncome(world: World, date: SimDate, homeClubId: string)
   world.ledger.record(date, "TICKET", WORLD_ACCOUNT, homeClubId, income);
 }
 
-export function payBroadcastBase(world: World, date: SimDate, clubIds: readonly string[]): void {
+export function payBroadcastBase(
+  world: World,
+  date: SimDate,
+  clubIds: readonly string[],
+  base: number = BROADCAST_BASE,
+): void {
   for (const clubId of clubIds) {
-    world.ledger.record(date, "BROADCAST", WORLD_ACCOUNT, clubId, BROADCAST_BASE);
+    world.ledger.record(date, "BROADCAST", WORLD_ACCOUNT, clubId, base);
   }
 }
 
-export function payMeritPayments(world: World, date: SimDate, table: readonly StandingRow[]): void {
+export function payMeritPayments(
+  world: World,
+  date: SimDate,
+  table: readonly StandingRow[],
+  broadcastBase: number = BROADCAST_BASE,
+): void {
+  const scale = broadcastBase / BROADCAST_BASE;
   table.forEach((row, index) => {
-    const amount = Math.round((table.length - index) * MERIT_STEP * 100) / 100;
+    const amount = Math.round((table.length - index) * MERIT_STEP * scale * 100) / 100;
     world.ledger.record(date, "MERIT", WORLD_ACCOUNT, row.clubId, amount, `pos ${index + 1}`);
   });
 }

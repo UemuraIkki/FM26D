@@ -1,0 +1,27 @@
+{
+  "id": "GER1",
+  "name": "Bundesliga",
+  "country": "Germany",
+  "valueCoefficient": 0.9,
+  "broadcastBase": 55,
+  "clubs": [
+    { "id": "FCB", "name": "FC Bayern München", "shortName": "Bayern", "strength": 88 },
+    { "id": "B04", "name": "Bayer 04 Leverkusen", "shortName": "Leverkusen", "strength": 82 },
+    { "id": "BVB", "name": "Borussia Dortmund", "shortName": "Dortmund", "strength": 81 },
+    { "id": "RBL", "name": "RB Leipzig", "shortName": "Leipzig", "strength": 78 },
+    { "id": "VFB", "name": "VfB Stuttgart", "shortName": "Stuttgart", "strength": 77 },
+    { "id": "SGE", "name": "Eintracht Frankfurt", "shortName": "Frankfurt", "strength": 77 },
+    { "id": "SCF", "name": "SC Freiburg", "shortName": "Freiburg", "strength": 74 },
+    { "id": "TSG", "name": "TSG Hoffenheim", "shortName": "Hoffenheim", "strength": 70 },
+    { "id": "WOB", "name": "VfL Wolfsburg", "shortName": "Wolfsburg", "strength": 71 },
+    { "id": "BMG", "name": "Borussia Mönchengladbach", "shortName": "Gladbach", "strength": 71 },
+    { "id": "M05", "name": "1. FSV Mainz 05", "shortName": "Mainz", "strength": 72 },
+    { "id": "FCA", "name": "FC Augsburg", "shortName": "Augsburg", "strength": 68 },
+    { "id": "SVW", "name": "SV Werder Bremen", "shortName": "Werder", "strength": 70 },
+    { "id": "FCU", "name": "1. FC Union Berlin", "shortName": "Union", "strength": 68 },
+    { "id": "STP", "name": "FC St. Pauli", "shortName": "St. Pauli", "strength": 65 },
+    { "id": "HDH", "name": "1. FC Heidenheim", "shortName": "Heidenheim", "strength": 63 },
+    { "id": "KOE", "name": "1. FC Köln", "shortName": "Köln", "strength": 66 },
+    { "id": "HSV", "name": "Hamburger SV", "shortName": "HSV", "strength": 66 }
+  ]
+}

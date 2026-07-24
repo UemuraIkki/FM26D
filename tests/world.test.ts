@@ -16,7 +16,9 @@ describe("persistent world", () => {
     expect(getSquad(world, "CHE").some((p) => p.id === mover.id)).toBe(true);
 
     // Running a season must not rebuild squads and erase the transfer.
-    runSeason(world, { startYear: 2026, keepMatches: false });
+    // Market disabled: this checks persistence infrastructure, not whether
+    // the simulated market happens to move this player again.
+    runSeason(world, { startYear: 2026, keepMatches: false, transfersEnabled: false });
     expect(getSquad(world, "CHE").some((p) => p.id === mover.id)).toBe(true);
     expect(getSquad(world, "ARS").some((p) => p.id === mover.id)).toBe(false);
   });

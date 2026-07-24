@@ -1,0 +1,27 @@
+{
+  "id": "FRA1",
+  "name": "Ligue 1",
+  "country": "France",
+  "valueCoefficient": 0.85,
+  "broadcastBase": 40,
+  "clubs": [
+    { "id": "PSG", "name": "Paris Saint-Germain", "shortName": "PSG", "strength": 88 },
+    { "id": "OM", "name": "Olympique de Marseille", "shortName": "Marseille", "strength": 78 },
+    { "id": "ASM", "name": "AS Monaco", "shortName": "Monaco", "strength": 78 },
+    { "id": "LIL", "name": "LOSC Lille", "shortName": "Lille", "strength": 75 },
+    { "id": "OL", "name": "Olympique Lyonnais", "shortName": "Lyon", "strength": 74 },
+    { "id": "NIC", "name": "OGC Nice", "shortName": "Nice", "strength": 73 },
+    { "id": "RCL", "name": "RC Lens", "shortName": "Lens", "strength": 72 },
+    { "id": "SRFC", "name": "Stade Rennais", "shortName": "Rennes", "strength": 72 },
+    { "id": "RCS", "name": "RC Strasbourg", "shortName": "Strasbourg", "strength": 71 },
+    { "id": "TFC", "name": "Toulouse FC", "shortName": "Toulouse", "strength": 68 },
+    { "id": "FCN", "name": "FC Nantes", "shortName": "Nantes", "strength": 66 },
+    { "id": "SB29", "name": "Stade Brestois", "shortName": "Brest", "strength": 68 },
+    { "id": "AJA", "name": "AJ Auxerre", "shortName": "Auxerre", "strength": 65 },
+    { "id": "SCO", "name": "Angers SCO", "shortName": "Angers", "strength": 63 },
+    { "id": "HAC", "name": "Le Havre AC", "shortName": "Le Havre", "strength": 63 },
+    { "id": "FCM", "name": "FC Metz", "shortName": "Metz", "strength": 62 },
+    { "id": "PFC", "name": "Paris FC", "shortName": "Paris FC", "strength": 66 },
+    { "id": "FCL", "name": "FC Lorient", "shortName": "Lorient", "strength": 63 }
+  ]
+}
