@@ -28,7 +28,9 @@ describe("transfer market (Phase C completion: the market turns)", () => {
 
     for (const move of report.transfers) {
       // The player really is at the destination club with a fresh contract.
-      const player = world.players.find((p) => p.id === move.playerId)!;
+      const player = world.players.find((p) => p.id === move.playerId);
+      // Retired since the move (requirement 4.3) — nothing left to check.
+      if (!player) continue;
       // May have moved again later in the window; at minimum they left the seller.
       if (player.clubId !== move.toClubId) {
         expect(report.transfers.some((t) => t.playerId === move.playerId && t !== move)).toBe(true);

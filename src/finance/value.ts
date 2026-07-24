@@ -1,3 +1,4 @@
+import type { Rng } from "../core/rng.js";
 import type { Player } from "../model/types.js";
 import { getRoleBook, isEligible, roleScore } from "../model/roles.js";
 
@@ -54,4 +55,14 @@ export function marketValue(player: Player, currentYear: number, leagueCoef = 1.
 export function wageFor(ability: number): number {
   const wage = 1.3 * Math.exp((ability - 60) / 13.5);
   return Math.round(Math.max(0.3, wage) * 100) / 100;
+}
+
+/**
+ * Ceiling ability (requirement 4.3) a young player can grow toward — more
+ * headroom the younger they are, none once they're through the growth
+ * window (used by src/model/development.ts's season-end attribute growth).
+ */
+export function growthPotential(currentAbility: number, age: number, rng: Rng): number {
+  const room = age <= 20 ? rng.int(8, 20) : age <= 23 ? rng.int(4, 12) : age <= 26 ? rng.int(0, 6) : 0;
+  return Math.min(99, currentAbility + room);
 }

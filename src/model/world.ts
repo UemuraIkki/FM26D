@@ -1,6 +1,6 @@
 import { deriveRng } from "../core/rng.js";
 import { Ledger } from "../finance/ledger.js";
-import { playerAbility, wageFor } from "../finance/value.js";
+import { growthPotential, playerAbility, wageFor } from "../finance/value.js";
 import type { PlayerMorale } from "../morale/morale.js";
 import { initialFitness, type PlayerFitness } from "./fitness.js";
 import { generateManagers, type Manager } from "./manager.js";
@@ -71,12 +71,15 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
       const contractRng = deriveRng(seed, `contracts:${club.id}`);
       const moraleRng = deriveRng(seed, `morale:${club.id}`);
       const nationalityRng = deriveRng(seed, `nationality:${club.id}`);
+      const potentialRng = deriveRng(seed, `potential:${club.id}`);
       for (const player of squad) {
+        const ability = playerAbility(player);
         player.contract = {
-          annualWage: wageFor(playerAbility(player)),
+          annualWage: wageFor(ability),
           endYear: foundedYear + contractRng.int(1, 4),
         };
         player.nationality = pickNationality(nationalityRng);
+        player.potential = growthPotential(ability, player.age, potentialRng);
         moraleByPlayer.set(player.id, {
           morale: 55 + moraleRng.int(0, 15),
           satisfaction: 55 + moraleRng.int(0, 10),
@@ -159,4 +162,30 @@ export function releasePlayer(world: World, playerId: string): void {
   player.clubId = null;
   player.contract = null;
   world.freeAgents.push(player);
+}
+
+/**
+ * Permanently remove a player (retirement, requirement 4.3) — distinct from
+ * `releasePlayer`, which keeps them signable as a free agent. Cleans up
+ * every per-player map alongside the roster/free-agent indices so nothing
+ * dangling survives a retiree.
+ */
+export function retirePlayer(world: World, playerId: string): void {
+  const idx = world.players.findIndex((p) => p.id === playerId);
+  if (idx < 0) throw new Error(`unknown player: ${playerId}`);
+  const player = world.players[idx]!;
+  if (player.clubId !== null) {
+    const squad = world.playersByClub.get(player.clubId);
+    if (squad) {
+      const sIdx = squad.findIndex((p) => p.id === playerId);
+      if (sIdx >= 0) squad.splice(sIdx, 1);
+    }
+  } else {
+    const fIdx = world.freeAgents.findIndex((p) => p.id === playerId);
+    if (fIdx >= 0) world.freeAgents.splice(fIdx, 1);
+  }
+  world.players.splice(idx, 1);
+  world.moraleByPlayer.delete(playerId);
+  world.fitnessByPlayer.delete(playerId);
+  world.capsByPlayer.delete(playerId);
 }

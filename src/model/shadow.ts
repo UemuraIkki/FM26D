@@ -1,4 +1,5 @@
 import { deriveRng } from "../core/rng.js";
+import { growthPotential, playerAbility } from "../finance/value.js";
 import { initialFitness } from "./fitness.js";
 import { pickNationality } from "./nationality.js";
 import type { World } from "./world.js";
@@ -52,16 +53,19 @@ export function supplyShadowProspects(world: World, year: number, count = 40): P
         attributes[key] = Math.max(1, Math.min(99, Math.round(base + rng.gaussian(0, 7))));
       }
     }
+    const age = 18 + rng.int(0, 10);
     const player: Player = {
       id: `SHW-${year}-${String(i + 1).padStart(2, "0")}`,
       name: `Shadow Prospect ${year}-${i + 1}`,
       clubId: null,
       position,
-      age: 18 + rng.int(0, 10),
+      age,
       attributes,
       contract: null,
       nationality: pickNationality(rng),
+      potential: 0,
     };
+    player.potential = growthPotential(playerAbility(player), age, rng);
     arrivals.push(player);
     world.players.push(player);
     world.freeAgents.push(player);

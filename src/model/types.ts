@@ -46,6 +46,8 @@ export interface Player {
   contract: Contract | null;
   /** Nation id (data/nationalities.json); drives national-team call-ups. */
   nationality: string;
+  /** Ceiling ability (playerAbility scale) a young player can grow toward (requirement 4.3). */
+  potential: number;
 }
 
 export interface Club {

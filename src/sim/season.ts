@@ -16,6 +16,7 @@ import {
   processContractExpiries,
 } from "../finance/economy.js";
 import { StandingsTable } from "../league/standings.js";
+import { processSeasonEndDevelopment } from "../model/development.js";
 import { applyFitnessToSheet, applyMatchFitnessCost, availableSquad, fitnessDailyTick } from "../model/fitness.js";
 import { getRoleBook, type Formation, type RoleBook } from "../model/roles.js";
 import { exitUnsignedFreeAgents, supplyShadowProspects } from "../model/shadow.js";
@@ -42,6 +43,8 @@ export interface SeasonReport {
   /** Sackings and appointments this season (requirements 5.2 / 5.4). */
   managerChanges: ManagerChange[];
   contractSummary: { renewed: number; released: number };
+  /** Aging, retirement and academy intake (requirement 4.3). */
+  development: { aged: number; retired: number; rookies: number };
   /** Champions League summary; undefined when the world has fewer than 2 leagues. */
   championsLeague?: CLReport;
   /** World Cup summary; only present in a WC year (startYear % 4 === 2). */
@@ -69,6 +72,8 @@ export interface SeasonOptions {
   playerAgent?: PlayerAgent;
   /** Disable the transfer market (e.g. for pure engine calibration runs). */
   transfersEnabled?: boolean;
+  /** Aging/retirement/academy intake on/off; default true. */
+  developmentEnabled?: boolean;
   /** Champions League on/off; default: on when 2+ leagues are simulated. */
   championsLeagueEnabled?: boolean;
   /** International windows + World Cup/EURO on/off; default: on when 2+ leagues are simulated. */
@@ -227,6 +232,11 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
   );
   const departures = transfersEnabled ? exitUnsignedFreeAgents(world) : 0;
 
+  const developmentEnabled = options.developmentEnabled !== false;
+  const development = developmentEnabled
+    ? processSeasonEndDevelopment(world, seasonLabel, startYear + 1, allClubIds, roleBook)
+    : { aged: 0, retired: 0, rookies: 0 };
+
   const report: SeasonReport = {
     seasonLabel,
     table: tables.get(world.leagues[0]!.id)!,
@@ -236,6 +246,7 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
     refusals: market.refusals,
     managerChanges,
     contractSummary,
+    development,
     internationalWindows: windows?.summary ?? { matches: 0, injuries: 0 },
     shadow: { arrivals, departures },
   };

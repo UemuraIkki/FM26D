@@ -17,7 +17,7 @@ function makePlayer(id: string, position: Player["position"], attrs: Partial<Pla
   };
   return {
     id, name: id, clubId: "T", position, age: 25,
-    attributes: { ...base, ...attrs }, contract: null, nationality: "ENG",
+    attributes: { ...base, ...attrs }, contract: null, nationality: "ENG", potential: 60,
   };
 }
 

@@ -1,6 +1,6 @@
 import { compareIds } from "../core/rng.js";
 import { marketValue, playerAbility } from "../finance/value.js";
-import { isEligible, roleScore } from "../model/roles.js";
+import { isEligible, minHeadcountByPosition, roleScore } from "../model/roles.js";
 import type { Player } from "../model/types.js";
 import { selectStartingXI } from "../sim/lineup.js";
 import { buildDepthChart, rankIn, type SquadRank } from "../squad/depthChart.js";
@@ -90,11 +90,15 @@ export class AIDecisionMaker implements ClubDecisionMaker {
 
   respondToOffer(context: SquadContext, player: Player, offeredFee: number): boolean {
     if (offeredFee < this.askingFeeFor(context, player)) return false;
-    // Never sell below the minimum needed to field a starting XI: a role
-    // with only `slots` eligible players left (post-sale) can't lose one.
-    const afterSale = context.squad.filter((p) => p.id !== player.id);
-    const chart = buildDepthChart(this.clubId, afterSale, context.roleBook, context.formation);
-    return chart.roles.every((rd) => rd.depth.length >= rd.slots);
+    // Never sell below the minimum needed to field a starting XI. Checked
+    // by position headcount, not per-role depth: two single-position roles
+    // (e.g. 4-4-2's P and CF, both FW-only) draw from the same position
+    // pool, so a role-by-role check alone under-counts the real need — a
+    // club with exactly 2 FWs can pass a naive "depth >= 1 slot" check for
+    // each forward role individually while only being able to field one.
+    const need = minHeadcountByPosition(context.roleBook, context.formation);
+    const remaining = context.squad.filter((p) => p.id !== player.id && p.position === player.position).length;
+    return remaining >= need[player.position];
   }
 
   /** Renewal policy at contract expiry: keep anyone the depth chart still needs. */

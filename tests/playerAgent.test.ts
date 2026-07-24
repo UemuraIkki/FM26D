@@ -18,6 +18,7 @@ function makePlayer(ambition: number): Player {
     attributes: base,
     contract: { annualWage: 4, endYear: 2029 },
     nationality: "ENG",
+    potential: 70,
   };
 }
 

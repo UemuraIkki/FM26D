@@ -92,3 +92,26 @@ export function roleScore(player: Player, role: Role): number {
 export function isEligible(player: Player, role: Role): boolean {
   return role.positions.includes(player.position);
 }
+
+/**
+ * Minimum headcount per position to field the formation at all: every slot
+ * whose role accepts exactly one position adds to that position's tally
+ * (summed, not maxed — e.g. 4-4-2's two single-position forward roles, P
+ * and CF, both draw exclusively from the same FW pool, so a club needs 2
+ * FWs, not 1, to fill both). Roles eligible for more than one position
+ * (e.g. False Nine) aren't counted — they can draw from either pool, so no
+ * single position is strictly required on their account.
+ */
+export function minHeadcountByPosition(
+  book: RoleBook,
+  formation: Formation = book.defaultFormation,
+): Record<Position, number> {
+  const need: Record<Position, number> = { GK: 0, DF: 0, MF: 0, FW: 0 };
+  const slotCounts = new Map<string, number>();
+  for (const slot of formation.slots) slotCounts.set(slot, (slotCounts.get(slot) ?? 0) + 1);
+  for (const [roleId, count] of slotCounts) {
+    const role = book.rolesById.get(roleId);
+    if (role && role.positions.length === 1) need[role.positions[0]!] += count;
+  }
+  return need;
+}
