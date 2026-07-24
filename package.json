@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "season": "tsx src/cli/main.ts season",
-    "calibrate": "tsx src/cli/main.ts calibrate"
+    "calibrate": "tsx src/cli/main.ts calibrate",
+    "depth": "tsx src/cli/main.ts depth"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

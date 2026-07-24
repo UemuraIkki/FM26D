@@ -1,4 +1,6 @@
-import { runSeason } from "../sim/season.js";
+import { getRoleBook } from "../model/roles.js";
+import { buildWorld, runSeason } from "../sim/season.js";
+import { buildDepthChart } from "../squad/depthChart.js";
 import { computeCalibration, CALIBRATION_TARGETS } from "../stats/calibration.js";
 
 /**
@@ -65,10 +67,44 @@ function commandCalibrate(): void {
   console.log(`\nH/D/A: ${pct(stats.homeWinRate)} / ${pct(stats.drawRate)} / ${pct(stats.awayWinRate)}`);
 }
 
+function argString(name: string): string | undefined {
+  const idx = process.argv.indexOf(`--${name}`);
+  return idx >= 0 ? process.argv[idx + 1] : undefined;
+}
+
+function commandDepth(): void {
+  const seed = argValue("seed", 20260808);
+  const clubFilter = argString("club");
+  const world = buildWorld(seed, LEAGUE_PATH);
+  const book = getRoleBook();
+
+  for (const club of world.league.clubs) {
+    if (clubFilter && club.id !== clubFilter) continue;
+    const squad = world.playersByClub.get(club.id)!;
+    const chart = buildDepthChart(club.id, squad, book);
+
+    console.log(`\n=== ${club.name} (${club.id}, str ${club.strength}) ===`);
+    if (clubFilter) {
+      for (const rd of chart.roles) {
+        const top = rd.depth
+          .slice(0, 3)
+          .map((e, i) => `${i + 1}) ${e.player.name} ${e.score.toFixed(1)}`)
+          .join("  ");
+        console.log(`${rd.roleId.padEnd(4)} x${rd.slots}  ${top}${rd.shortage ? "  << SHORTAGE" : ""}`);
+      }
+    }
+    const shortages = chart.shortages.map((r) => r.roleId).join(", ") || "none";
+    const surplus = chart.surplus.map((p) => `${p.name}(${p.position})`).join(", ") || "none";
+    console.log(`shortages: ${shortages}`);
+    console.log(`surplus:   ${surplus}`);
+  }
+}
+
 const command = process.argv[2];
 if (command === "season") commandSeason();
 else if (command === "calibrate") commandCalibrate();
+else if (command === "depth") commandDepth();
 else {
-  console.log("usage: main.ts <season|calibrate> [--seed N] [--year N] [--seasons N]");
+  console.log("usage: main.ts <season|calibrate|depth> [--seed N] [--year N] [--seasons N] [--club ID]");
   process.exit(1);
 }

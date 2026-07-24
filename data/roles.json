@@ -1,0 +1,31 @@
+{
+  "roles": [
+    { "id": "GK", "name": "Goalkeeper", "positions": ["GK"], "weights": { "shotStopping": 3, "aerialHandling": 2, "positioning": 1.5, "agility": 1.5, "decisions": 1 } },
+    { "id": "SK", "name": "Sweeper Keeper", "positions": ["GK"], "weights": { "shotStopping": 2.5, "distribution": 2, "speed": 1.5, "decisions": 1.5, "agility": 1, "aerialHandling": 1 } },
+
+    { "id": "CB", "name": "Centre Back", "positions": ["DF"], "weights": { "defending": 3, "aerial": 2, "positioning": 2, "strength": 1.5, "decisions": 1 } },
+    { "id": "BPD", "name": "Ball-Playing Defender", "positions": ["DF"], "weights": { "defending": 2.5, "passing": 2, "positioning": 1.5, "aerial": 1.5, "decisions": 1.5 } },
+    { "id": "FB", "name": "Full Back", "positions": ["DF"], "weights": { "defending": 2, "speed": 1.5, "stamina": 1.5, "positioning": 1.5, "passing": 1, "dribbling": 0.5 } },
+    { "id": "WB", "name": "Wing Back", "positions": ["DF", "MF"], "weights": { "stamina": 2, "speed": 2, "dribbling": 1.5, "passing": 1.5, "defending": 1.5, "agility": 1 } },
+
+    { "id": "DM", "name": "Anchor", "positions": ["MF"], "weights": { "defending": 2.5, "positioning": 2, "decisions": 1.5, "strength": 1.5, "passing": 1 } },
+    { "id": "BWM", "name": "Ball-Winning Midfielder", "positions": ["MF"], "weights": { "defending": 2.5, "stamina": 2, "strength": 1.5, "agility": 1, "decisions": 1 } },
+    { "id": "DLP", "name": "Deep-Lying Playmaker", "positions": ["MF"], "weights": { "passing": 3, "decisions": 2, "positioning": 1.5, "agility": 1 } },
+    { "id": "CM", "name": "Box-to-Box Midfielder", "positions": ["MF"], "weights": { "stamina": 2, "passing": 1.5, "defending": 1.5, "decisions": 1.5, "shooting": 1, "strength": 1 } },
+    { "id": "AP", "name": "Advanced Playmaker", "positions": ["MF"], "weights": { "passing": 2.5, "dribbling": 2, "decisions": 2, "agility": 1.5 } },
+    { "id": "AM", "name": "Attacking Midfielder", "positions": ["MF", "FW"], "weights": { "passing": 2, "shooting": 1.5, "dribbling": 1.5, "decisions": 1.5, "finishing": 1 } },
+    { "id": "WM", "name": "Wide Midfielder", "positions": ["MF"], "weights": { "stamina": 2, "passing": 1.5, "dribbling": 1.5, "speed": 1.5, "defending": 1 } },
+    { "id": "W", "name": "Winger", "positions": ["MF", "FW"], "weights": { "speed": 2.5, "dribbling": 2.5, "agility": 1.5, "passing": 1 } },
+
+    { "id": "IF", "name": "Inside Forward", "positions": ["FW", "MF"], "weights": { "dribbling": 2, "shooting": 2, "speed": 1.5, "finishing": 1.5, "agility": 1 } },
+    { "id": "PF", "name": "Pressing Forward", "positions": ["FW"], "weights": { "stamina": 2, "defending": 1.5, "speed": 1.5, "shooting": 1.5, "strength": 1 } },
+    { "id": "TM", "name": "Target Man", "positions": ["FW"], "weights": { "aerial": 3, "strength": 2.5, "finishing": 1.5, "positioning": 1 } },
+    { "id": "P", "name": "Poacher", "positions": ["FW"], "weights": { "finishing": 3, "positioning": 2.5, "shooting": 2, "speed": 1 } },
+    { "id": "CF", "name": "Complete Forward", "positions": ["FW"], "weights": { "shooting": 2, "finishing": 2, "aerial": 1.5, "strength": 1.5, "dribbling": 1.5, "decisions": 1 } },
+    { "id": "F9", "name": "False Nine", "positions": ["FW", "MF"], "weights": { "passing": 2, "dribbling": 2, "decisions": 2, "finishing": 1.5, "agility": 1.5 } }
+  ],
+  "defaultFormation": {
+    "name": "4-4-2",
+    "slots": ["GK", "CB", "CB", "FB", "FB", "WM", "WM", "CM", "DLP", "CF", "P"]
+  }
+}
