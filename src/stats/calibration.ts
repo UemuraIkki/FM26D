@@ -13,36 +13,51 @@ export interface CalibrationStats {
   homeAdvantage: number;
 }
 
-export function computeCalibration(matches: readonly PlayedMatch[]): CalibrationStats {
-  let goals = 0;
-  let passesAttempted = 0;
-  let passesCompleted = 0;
-  let shots = 0;
-  let homeWins = 0;
-  let draws = 0;
-  let awayWins = 0;
+/**
+ * Streaming accumulator so multi-thousand-season runs never retain match
+ * objects (each carries a full event log) in memory.
+ */
+export class CalibrationAccumulator {
+  private goals = 0;
+  private passesAttempted = 0;
+  private passesCompleted = 0;
+  private shots = 0;
+  private homeWins = 0;
+  private draws = 0;
+  private awayWins = 0;
+  private count = 0;
 
-  for (const { result } of matches) {
-    goals += result.homeGoals + result.awayGoals;
-    passesAttempted += result.home.passesAttempted + result.away.passesAttempted;
-    passesCompleted += result.home.passesCompleted + result.away.passesCompleted;
-    shots += result.home.shots + result.away.shots;
-    if (result.homeGoals > result.awayGoals) homeWins++;
-    else if (result.homeGoals < result.awayGoals) awayWins++;
-    else draws++;
+  add(match: PlayedMatch): void {
+    const { result } = match;
+    this.count++;
+    this.goals += result.homeGoals + result.awayGoals;
+    this.passesAttempted += result.home.passesAttempted + result.away.passesAttempted;
+    this.passesCompleted += result.home.passesCompleted + result.away.passesCompleted;
+    this.shots += result.home.shots + result.away.shots;
+    if (result.homeGoals > result.awayGoals) this.homeWins++;
+    else if (result.homeGoals < result.awayGoals) this.awayWins++;
+    else this.draws++;
   }
 
-  const n = Math.max(matches.length, 1);
-  return {
-    matches: matches.length,
-    goalsPerMatch: goals / n,
-    passSuccessRate: passesAttempted > 0 ? passesCompleted / passesAttempted : 0,
-    shotsPerTeamPerMatch: shots / (2 * n),
-    homeWinRate: homeWins / n,
-    drawRate: draws / n,
-    awayWinRate: awayWins / n,
-    homeAdvantage: (homeWins - awayWins) / n,
-  };
+  stats(): CalibrationStats {
+    const n = Math.max(this.count, 1);
+    return {
+      matches: this.count,
+      goalsPerMatch: this.goals / n,
+      passSuccessRate: this.passesAttempted > 0 ? this.passesCompleted / this.passesAttempted : 0,
+      shotsPerTeamPerMatch: this.shots / (2 * n),
+      homeWinRate: this.homeWins / n,
+      drawRate: this.draws / n,
+      awayWinRate: this.awayWins / n,
+      homeAdvantage: (this.homeWins - this.awayWins) / n,
+    };
+  }
+}
+
+export function computeCalibration(matches: readonly PlayedMatch[]): CalibrationStats {
+  const acc = new CalibrationAccumulator();
+  for (const match of matches) acc.add(match);
+  return acc.stats();
 }
 
 export const CALIBRATION_TARGETS = {

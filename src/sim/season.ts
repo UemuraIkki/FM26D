@@ -27,6 +27,12 @@ export interface SeasonOptions {
   engineParams?: Partial<EngineParams>;
   /** Called after each simulated day that had matches. */
   onMatch?: (played: PlayedMatch) => void;
+  /**
+   * Retain per-match results (with full event logs) in the report.
+   * Disable for bulk statistical runs to keep memory flat; consumers then
+   * aggregate via `onMatch`. Default true.
+   */
+  keepMatches?: boolean;
 }
 
 export function buildWorld(seed: number, leaguePath: string): World {
@@ -73,7 +79,7 @@ export function runSeason(options: SeasonOptions): SeasonReport {
         const result = simulateMatch(home, away, rng, options.engineParams);
         table.record(fixture.homeClubId, fixture.awayClubId, result.homeGoals, result.awayGoals);
         const played = { fixture, result };
-        matches.push(played);
+        if (options.keepMatches !== false) matches.push(played);
         options.onMatch?.(played);
       }
     }

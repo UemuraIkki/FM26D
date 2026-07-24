@@ -1,7 +1,7 @@
 import { getRoleBook } from "../model/roles.js";
 import { buildWorld, runSeason } from "../sim/season.js";
 import { buildDepthChart } from "../squad/depthChart.js";
-import { computeCalibration, CALIBRATION_TARGETS } from "../stats/calibration.js";
+import { CalibrationAccumulator, computeCalibration, CALIBRATION_TARGETS } from "../stats/calibration.js";
 
 /**
  * Headless CLI (Phase A).
@@ -45,14 +45,19 @@ function commandSeason(): void {
 function commandCalibrate(): void {
   const seasons = argValue("seasons", 50);
   const baseSeed = argValue("seed", 1);
-  const all = [];
+  const acc = new CalibrationAccumulator();
   const start = Date.now();
   for (let s = 0; s < seasons; s++) {
-    const report = runSeason({ leaguePath: LEAGUE_PATH, seed: baseSeed + s, startYear: 2026 });
-    all.push(...report.matches);
+    runSeason({
+      leaguePath: LEAGUE_PATH,
+      seed: baseSeed + s,
+      startYear: 2026,
+      keepMatches: false,
+      onMatch: (m) => acc.add(m),
+    });
   }
   const elapsed = (Date.now() - start) / 1000;
-  const stats = computeCalibration(all);
+  const stats = acc.stats();
 
   console.log(`\n=== Calibration over ${seasons} seasons (${stats.matches} matches, ${elapsed.toFixed(1)}s) ===\n`);
   const rows: Array<[string, string, string, boolean]> = [
