@@ -48,6 +48,10 @@ function commandSeason(): void {
     const fee = t.fee > 0 ? `£${t.fee.toFixed(1)}M` : "free";
     console.log(`${t.date}  ${t.playerName.padEnd(24)} ${(t.fromClubId ?? "FA").padEnd(4)} -> ${t.toClubId.padEnd(4)} ${fee}`);
   }
+  console.log(`\n=== Refused moves (${report.refusals.length}) ===`);
+  for (const r of report.refusals) {
+    console.log(`${r.date}  ${r.playerName.padEnd(24)} ${(r.fromClubId ?? "FA").padEnd(4)} -> ${r.toClubId.padEnd(4)} refused: ${r.reason}`);
+  }
   console.log(`\nContracts: ${report.contractSummary.renewed} renewed, ${report.contractSummary.released} released to free agency`);
   const drift = world.ledger.conservationDrift();
   console.log(`Money conservation drift: ${drift} (must be 0)`);

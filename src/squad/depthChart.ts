@@ -81,6 +81,21 @@ function draftRound(
   }
 }
 
+export type SquadRank = "STARTER" | "BACKUP" | "OUT";
+
+/** Squad status of one player according to the exclusive allocation. */
+export function rankIn(chart: ClubDepthChart, playerId: string): SquadRank {
+  for (const rd of chart.roles) {
+    const starters = rd.assigned.slice(0, rd.slots);
+    if (starters.some((e) => e.player.id === playerId)) return "STARTER";
+  }
+  for (const rd of chart.roles) {
+    const backups = rd.assigned.slice(rd.slots);
+    if (backups.some((e) => e.player.id === playerId)) return "BACKUP";
+  }
+  return "OUT";
+}
+
 export function buildDepthChart(
   clubId: string,
   squad: readonly Player[],

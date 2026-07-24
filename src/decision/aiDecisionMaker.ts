@@ -3,7 +3,7 @@ import { marketValue, playerAbility } from "../finance/value.js";
 import { isEligible, roleScore } from "../model/roles.js";
 import type { Player } from "../model/types.js";
 import { selectStartingXI } from "../sim/lineup.js";
-import { buildDepthChart } from "../squad/depthChart.js";
+import { buildDepthChart, rankIn, type SquadRank } from "../squad/depthChart.js";
 import type {
   ClubDecisionMaker,
   LineupContext,
@@ -19,9 +19,14 @@ const IMPROVEMENT_THRESHOLD = 2;
 const MAX_FEE_FRACTION = 0.5;
 
 /** Ask multipliers by squad status (requirement 5.5 step 3: self-valuation × depth coef). */
-const ASK_STARTER = 1.6;
-const ASK_BACKUP = 1.15;
-const ASK_SURPLUS = 0.75;
+export const ASK_MULTIPLIER: Record<SquadRank, number> = {
+  STARTER: 1.6,
+  BACKUP: 1.15,
+  OUT: 0.75,
+};
+
+/** Minimum ability for a pure squad-depth signing (filling an empty backup slot). */
+const DEPTH_FLOOR = 60;
 
 /** Default autonomous club brain used for every club in observation mode. */
 export class AIDecisionMaker implements ClubDecisionMaker {
@@ -40,41 +45,42 @@ export class AIDecisionMaker implements ClubDecisionMaker {
   askingFeeFor(context: SquadContext, player: Player): number {
     const chart = buildDepthChart(this.clubId, context.squad, context.roleBook, context.formation);
     const value = marketValue(player, context.currentYear);
-    let coef = ASK_SURPLUS;
-    for (const rd of chart.roles) {
-      const starterIds = rd.assigned.slice(0, rd.slots).map((e) => e.player.id);
-      const backupIds = rd.assigned.slice(rd.slots).map((e) => e.player.id);
-      if (starterIds.includes(player.id)) return Math.round(value * ASK_STARTER * 100) / 100;
-      if (backupIds.includes(player.id)) coef = Math.max(coef, ASK_BACKUP);
-    }
-    return Math.round(value * coef * 100) / 100;
+    const rank = rankIn(chart, player.id);
+    return Math.round(value * ASK_MULTIPLIER[rank] * 100) / 100;
   }
 
   chooseSigning(context: SquadContext, candidates: readonly MarketCandidate[]): SigningChoice | null {
-    // Requirement 5.5 steps 1-2: scan starter weaknesses per formation role,
-    // rank candidates by improvement per cost.
+    // Requirement 5.5 steps 1-2: need scan per formation role, then rank
+    // candidates by improvement per cost. Two kinds of demand:
+    //  - starter upgrade: candidate beats the weakest current starter
+    //  - depth fill: a role is missing backups (exclusive allocation short)
     const chart = buildDepthChart(this.clubId, context.squad, context.roleBook, context.formation);
     const weakestStarter = new Map<string, number>();
+    const missingBackups = new Set<string>();
     for (const rd of chart.roles) {
       const starters = rd.assigned.slice(0, rd.slots);
-      if (starters.length < rd.slots) {
-        weakestStarter.set(rd.roleId, 0); // unfilled slot: any eligible player improves
-      } else {
-        weakestStarter.set(rd.roleId, Math.min(...starters.map((e) => e.score)));
-      }
+      weakestStarter.set(rd.roleId, starters.length < rd.slots ? 0 : Math.min(...starters.map((e) => e.score)));
+      if (rd.assigned.length < rd.required) missingBackups.add(rd.roleId);
     }
 
     let best: { choice: SigningChoice; utility: number; id: string } | null = null;
     for (const { player, askingFee } of candidates) {
       if (askingFee > context.balance * MAX_FEE_FRACTION) continue;
-      let improvement = 0;
+      let utility = 0;
       for (const [roleId, starterScore] of weakestStarter) {
         const role = context.roleBook.rolesById.get(roleId)!;
         if (!isEligible(player, role)) continue;
-        improvement = Math.max(improvement, roleScore(player, role) - starterScore);
+        const score = roleScore(player, role);
+        const starterGain = score - starterScore;
+        if (starterGain >= IMPROVEMENT_THRESHOLD) {
+          utility = Math.max(utility, starterGain / (1 + askingFee / 20));
+        }
+        if (missingBackups.has(roleId) && score >= DEPTH_FLOOR + IMPROVEMENT_THRESHOLD) {
+          // Depth signings matter less than XI upgrades.
+          utility = Math.max(utility, (0.5 * (score - DEPTH_FLOOR)) / (1 + askingFee / 20));
+        }
       }
-      if (improvement < IMPROVEMENT_THRESHOLD) continue;
-      const utility = improvement / (1 + askingFee / 20);
+      if (utility <= 0) continue;
       if (!best || utility > best.utility || (utility === best.utility && compareIds(player.id, best.id) < 0)) {
         best = { choice: { playerId: player.id, offeredFee: askingFee }, utility, id: player.id };
       }

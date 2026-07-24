@@ -2,7 +2,7 @@ import { addDays, compareDates, toIso, type SimDate } from "../core/calendar.js"
 import { deriveRng } from "../core/rng.js";
 import type { ClubDecisionMaker } from "../decision/clubDecisionMaker.js";
 import { AIDecisionMaker } from "../decision/aiDecisionMaker.js";
-import { AlwaysAcceptAgent, type PlayerAgent } from "../decision/playerAgent.js";
+import { RationalPlayerAgent, type PlayerAgent } from "../decision/playerAgent.js";
 import { simulateMatch, type EngineParams, type MatchResult } from "../engine/index.js";
 import {
   payBroadcastBase,
@@ -15,7 +15,7 @@ import { StandingsTable } from "../league/standings.js";
 import { getRoleBook, type RoleBook } from "../model/roles.js";
 import { getSquad, type World } from "../model/world.js";
 import { fixturesByDate, generateSeasonFixtures, type Fixture } from "../schedule/fixtures.js";
-import { TransferMarket, type TransferRecord } from "../transfer/market.js";
+import { TransferMarket, type RefusalRecord, type TransferRecord } from "../transfer/market.js";
 
 export interface PlayedMatch {
   fixture: Fixture;
@@ -27,6 +27,8 @@ export interface SeasonReport {
   table: StandingsTable;
   matches: PlayedMatch[];
   transfers: TransferRecord[];
+  /** Moves that fell through on the player's own decision (requirement 5.5-4). */
+  refusals: RefusalRecord[];
   contractSummary: { renewed: number; released: number };
 }
 
@@ -92,7 +94,7 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
     roleBook,
     roleBook.defaultFormation,
     brains,
-    options.playerAgent ?? new AlwaysAcceptAgent(),
+    options.playerAgent ?? new RationalPlayerAgent(),
     startYear + 1,
   );
 
@@ -134,5 +136,5 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
     roleBook.defaultFormation,
   );
 
-  return { seasonLabel, table, matches, transfers: market.completed, contractSummary };
+  return { seasonLabel, table, matches, transfers: market.completed, refusals: market.refusals, contractSummary };
 }
