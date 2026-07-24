@@ -52,6 +52,10 @@ function commandSeason(): void {
   for (const r of report.refusals) {
     console.log(`${r.date}  ${r.playerName.padEnd(24)} ${(r.fromClubId ?? "FA").padEnd(4)} -> ${r.toClubId.padEnd(4)} refused: ${r.reason}`);
   }
+  console.log(`\n=== Manager changes (${report.managerChanges.length}) ===`);
+  for (const c of report.managerChanges) {
+    console.log(`${c.date}  ${c.clubId.padEnd(4)} ${c.outManagerName} -> ${c.inManagerName}  (${c.reason})`);
+  }
   console.log(`\nContracts: ${report.contractSummary.renewed} renewed, ${report.contractSummary.released} released to free agency`);
   const drift = world.ledger.conservationDrift();
   console.log(`Money conservation drift: ${drift} (must be 0)`);

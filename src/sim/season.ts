@@ -1,4 +1,5 @@
 import { addDays, compareDates, toIso, type SimDate } from "../core/calendar.js";
+import { BoardSystem, managerMultiplier, type ManagerChange } from "../board/board.js";
 import { deriveRng } from "../core/rng.js";
 import type { ClubDecisionMaker } from "../decision/clubDecisionMaker.js";
 import { AIDecisionMaker } from "../decision/aiDecisionMaker.js";
@@ -30,6 +31,8 @@ export interface SeasonReport {
   transfers: TransferRecord[];
   /** Moves that fell through on the player's own decision (requirement 5.5-4). */
   refusals: RefusalRecord[];
+  /** Sackings and appointments this season (requirements 5.2 / 5.4). */
+  managerChanges: ManagerChange[];
   contractSummary: { renewed: number; released: number };
 }
 
@@ -90,6 +93,7 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
 
   const table = new StandingsTable(clubIds);
   const matches: PlayedMatch[] = [];
+  const board = new BoardSystem(world, clubIds);
   const market = new TransferMarket(
     world,
     roleBook,
@@ -115,18 +119,22 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
         const home = brains.get(fixture.homeClubId)!.selectLineup({ ...context, squad: getSquad(world, fixture.homeClubId) });
         const away = brains.get(fixture.awayClubId)!.selectLineup({ ...context, squad: getSquad(world, fixture.awayClubId) });
         const rng = deriveRng(world.seed, `match:${fixture.id}`);
-        // Morale scales match-day ability, capped at ±5% (requirement 4.7).
+        // Morale (±5%) and manager quality (±2%) scale match-day ability.
         const result = simulateMatch(
-          applyMoraleToSheet(world, home),
-          applyMoraleToSheet(world, away),
+          scaleSheet(applyMoraleToSheet(world, home), managerMultiplier(world, fixture.homeClubId)),
+          scaleSheet(applyMoraleToSheet(world, away), managerMultiplier(world, fixture.awayClubId)),
           rng,
           options.engineParams,
         );
         table.record(fixture.homeClubId, fixture.awayClubId, result.homeGoals, result.awayGoals);
         payTicketIncome(world, day, fixture.homeClubId);
         const homeOutcome = result.homeGoals > result.awayGoals ? "WIN" : result.homeGoals < result.awayGoals ? "LOSS" : "DRAW";
+        const awayOutcome = homeOutcome === "WIN" ? "LOSS" : homeOutcome === "LOSS" ? "WIN" : "DRAW";
         applyMatchMorale(world, fixture.homeClubId, home, homeOutcome);
-        applyMatchMorale(world, fixture.awayClubId, away, homeOutcome === "WIN" ? "LOSS" : homeOutcome === "LOSS" ? "WIN" : "DRAW");
+        applyMatchMorale(world, fixture.awayClubId, away, awayOutcome);
+        const sorted = table.sorted();
+        board.reviewAfterMatch(day, fixture.homeClubId, homeOutcome, sorted);
+        board.reviewAfterMatch(day, fixture.awayClubId, awayOutcome, sorted);
         const played = { fixture, result };
         if (options.keepMatches !== false) matches.push(played);
         options.onMatch?.(played);
@@ -135,7 +143,8 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
     day = addDays(day, 1);
   }
 
-  // Season end: merit payments by final position, then contract expiries.
+  // Season end: board verdicts, merit payments by final position, contract expiries.
+  board.reviewSeasonEnd(day, table.sorted());
   payMeritPayments(world, day, table.sorted());
   const contractSummary = processContractExpiries(
     world,
@@ -147,5 +156,39 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
     roleBook.defaultFormation,
   );
 
-  return { seasonLabel, table, matches, transfers: market.completed, refusals: market.refusals, contractSummary };
+  return {
+    seasonLabel,
+    table,
+    matches,
+    transfers: market.completed,
+    refusals: market.refusals,
+    managerChanges: board.changes,
+    contractSummary,
+  };
+}
+
+/** Uniformly scale a sheet's outfield-relevant attributes (bounded factors only). */
+function scaleSheet(sheet: ReturnType<typeof applyMoraleToSheet>, factor: number) {
+  if (factor === 1) return sheet;
+  return {
+    teamId: sheet.teamId,
+    players: sheet.players.map((p) => ({
+      ...p,
+      passing: p.passing * factor,
+      shooting: p.shooting * factor,
+      dribbling: p.dribbling * factor,
+      defending: p.defending * factor,
+      aerial: p.aerial * factor,
+      speed: p.speed * factor,
+      stamina: p.stamina * factor,
+      strength: p.strength * factor,
+      agility: p.agility * factor,
+      decisions: p.decisions * factor,
+      positioning: p.positioning * factor,
+      finishing: p.finishing * factor,
+      shotStopping: p.shotStopping * factor,
+      aerialHandling: p.aerialHandling * factor,
+      distribution: p.distribution * factor,
+    })),
+  };
 }

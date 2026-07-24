@@ -2,6 +2,7 @@ import { deriveRng } from "../core/rng.js";
 import { Ledger } from "../finance/ledger.js";
 import { playerAbility, wageFor } from "../finance/value.js";
 import type { PlayerMorale } from "../morale/morale.js";
+import { generateManagers, type Manager } from "./manager.js";
 import { loadLeague } from "./loader.js";
 import { generateSquad } from "./playerGen.js";
 import type { Club, LeagueData, Player } from "./types.js";
@@ -33,6 +34,10 @@ export interface World {
   moraleByPlayer: Map<string, PlayerMorale>;
   /** Team atmosphere per club, 0-100 (requirement 4.7). */
   atmosphereByClub: Map<string, number>;
+  /** Manager entities incl. the out-of-work market pool (requirement 5.4). */
+  managers: Manager[];
+  /** Board confidence in the current manager per club (requirement 5.2). */
+  boardConfidence: Map<string, number>;
   /** Calendar year world creation; used to seed contract end-years. */
   foundedYear: number;
 }
@@ -75,6 +80,8 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
     }
   }
 
+  const managers = generateManagers(seed, [...clubsById.values()]);
+
   return {
     seed,
     leagues,
@@ -85,6 +92,8 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
     ledger,
     moraleByPlayer,
     atmosphereByClub,
+    managers,
+    boardConfidence: new Map(),
     foundedYear,
   };
 }
