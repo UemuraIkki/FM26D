@@ -41,15 +41,16 @@ npm run depth -- --club ARS         # 1クラブのデプスチャート詳細
 ## 構成
 
 ```
-data/leagues/           リーグ・クラブ定義(データ駆動、JSON)
-src/core/               シード付き乱数(rng.ts)・カレンダー(日次ティック)
+data/                   リーグ・ロール・選手生成の定義(全てデータ駆動、JSON)
+src/core/               シード付き乱数(チェックポイント可)・カレンダー(日次ティック)
 src/engine/             試合エンジン(独立モジュール: sim側をimportしない)
-src/model/              型・データローダー・暫定選手生成(17属性)・ロール適性
-src/squad/              デプスチャート(不足/余剰検出)
+src/model/              型・ローダー・永続ワールド(複数リーグ)・暫定選手生成・ロール適性
+src/decision/           ClubDecisionMaker(絶対制約)と AIDecisionMaker
+src/squad/              デプスチャート(排他ドラフトによる不足/余剰検出)
 src/schedule/           日程生成
 src/league/             順位表
 src/sim/                シーズンループ・スタメン選考
-src/stats/              キャリブレーション集計
+src/stats/              キャリブレーション集計(ストリーミング)
 src/cli/                ヘッドレスCLI
 tests/                  vitest
 ```
@@ -59,7 +60,14 @@ tests/                  vitest
 - 乱数は必ず `src/core/rng.ts` の `Rng` を使う。`Math.random()` 禁止(決定論要件 3.2)
 - サブシステムの乱数は `deriveRng(worldSeed, label)` で導出し、消費順序の影響を分離する
 - `src/engine/` は独立パッケージ相当。sim 側の型を import しない(将来 Rust/WASM 置換可能)
-- クラブの意思決定は将来 `ClubDecisionMaker` インターフェース経由(フェーズC以降)
+- クラブの意思決定は必ず `ClubDecisionMaker` 経由(要件1の絶対制約)。観測モードは全クラブ `AIDecisionMaker`
+- ワールドは `buildWorld` で一度だけ構築し、シーズンをまたいで永続。選手の所有権変更は `transferPlayer` のみ
+- 決定的なソートのタイブレークは `compareIds`(ロケール非依存)を使う。`localeCompare` 禁止
+
+### 既知の制約(記録)
+
+- `Math.exp`/`Math.log`/`Math.cos` に依存するため、異なるランタイム(将来のRust/WASM)とはビット互換の決定論にならない。置換時に固定小数点または多項式近似で対処予定
+- スタメン選考は希少度順の貪欲法(充足保証あり)。全体最適割り当てではない
 
 ## 次のフェーズ
 

@@ -2,11 +2,20 @@ import { addDays, compareDates, toIso, type SimDate } from "../core/calendar.js"
 import { deriveRng } from "../core/rng.js";
 import type { ClubDecisionMaker } from "../decision/clubDecisionMaker.js";
 import { AIDecisionMaker } from "../decision/aiDecisionMaker.js";
+import { AlwaysAcceptAgent, type PlayerAgent } from "../decision/playerAgent.js";
 import { simulateMatch, type EngineParams, type MatchResult } from "../engine/index.js";
+import {
+  payBroadcastBase,
+  payMeritPayments,
+  payMonthlyWages,
+  payTicketIncome,
+  processContractExpiries,
+} from "../finance/economy.js";
 import { StandingsTable } from "../league/standings.js";
 import { getRoleBook, type RoleBook } from "../model/roles.js";
 import { getSquad, type World } from "../model/world.js";
 import { fixturesByDate, generateSeasonFixtures, type Fixture } from "../schedule/fixtures.js";
+import { TransferMarket, type TransferRecord } from "../transfer/market.js";
 
 export interface PlayedMatch {
   fixture: Fixture;
@@ -17,6 +26,8 @@ export interface SeasonReport {
   seasonLabel: string;
   table: StandingsTable;
   matches: PlayedMatch[];
+  transfers: TransferRecord[];
+  contractSummary: { renewed: number; released: number };
 }
 
 export interface SeasonOptions {
@@ -32,6 +43,10 @@ export interface SeasonOptions {
    * AIDecisionMaker — the future manager mode overrides exactly one entry.
    */
   decisionMakers?: ReadonlyMap<string, ClubDecisionMaker>;
+  /** Player-side transfer consent (Phase C default: always accepts). */
+  playerAgent?: PlayerAgent;
+  /** Disable the transfer market (e.g. for pure engine calibration runs). */
+  transfersEnabled?: boolean;
   /** Called after each simulated match. */
   onMatch?: (played: PlayedMatch) => void;
   /**
@@ -44,8 +59,9 @@ export interface SeasonOptions {
 
 /**
  * Run one league season with the daily tick loop (requirement 3.1) over a
- * persistent world. The world is built once by the caller and survives across
- * seasons so later phases (transfers, contracts, morale) can mutate it.
+ * persistent world. The loop starts July 1 (summer transfer window) and ends
+ * after the final matchday plus season-end processing (merit payments,
+ * contract expiries), so world state carries correctly into the next season.
  */
 export function runSeason(world: World, options: SeasonOptions): SeasonReport {
   const { startYear } = options;
@@ -57,6 +73,7 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
   const seasonLabel = `${league.id}-${startYear}`;
   const clubIds = league.clubs.map((c) => c.id);
   const roleBook = options.roleBook ?? getRoleBook();
+  const transfersEnabled = options.transfersEnabled !== false;
 
   const brains = new Map<string, ClubDecisionMaker>();
   for (const id of clubIds) {
@@ -70,9 +87,23 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
 
   const table = new StandingsTable(clubIds);
   const matches: PlayedMatch[] = [];
+  const market = new TransferMarket(
+    world,
+    roleBook,
+    roleBook.defaultFormation,
+    brains,
+    options.playerAgent ?? new AlwaysAcceptAgent(),
+    startYear + 1,
+  );
 
-  let day = seasonStart;
+  // Daily tick from July 1 (window opens) through the final matchday.
+  let day: SimDate = { year: startYear, month: 7, day: 1 };
+  const broadcastDay = toIso({ year: startYear, month: 8, day: 1 });
   while (compareDates(day, lastDate) <= 0) {
+    payMonthlyWages(world, day, clubIds);
+    if (toIso(day) === broadcastDay) payBroadcastBase(world, day, clubIds);
+    if (transfersEnabled) market.processDay(day, clubIds);
+
     const todays = byDate.get(toIso(day));
     if (todays) {
       for (const fixture of todays) {
@@ -82,6 +113,7 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
         const rng = deriveRng(world.seed, `match:${fixture.id}`);
         const result = simulateMatch(home, away, rng, options.engineParams);
         table.record(fixture.homeClubId, fixture.awayClubId, result.homeGoals, result.awayGoals);
+        payTicketIncome(world, day, fixture.homeClubId);
         const played = { fixture, result };
         if (options.keepMatches !== false) matches.push(played);
         options.onMatch?.(played);
@@ -90,5 +122,17 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
     day = addDays(day, 1);
   }
 
-  return { seasonLabel, table, matches };
+  // Season end: merit payments by final position, then contract expiries.
+  payMeritPayments(world, day, table.sorted());
+  const contractSummary = processContractExpiries(
+    world,
+    day,
+    startYear + 1,
+    clubIds,
+    brains,
+    roleBook,
+    roleBook.defaultFormation,
+  );
+
+  return { seasonLabel, table, matches, transfers: market.completed, contractSummary };
 }

@@ -27,13 +27,23 @@ export interface PlayerAttributes {
   distribution: number;
 }
 
+/** Requirement 4.6: wage, duration, free transfers on expiry. */
+export interface Contract {
+  /** Annual wage in currency units (1 = 1M). */
+  annualWage: number;
+  /** Season end-year through which the contract runs (e.g. 2028 = until summer 2028). */
+  endYear: number;
+}
+
 export interface Player {
   id: string;
   name: string;
-  clubId: string;
+  /** null = free agent (out of contract). */
+  clubId: string | null;
   position: Position;
   age: number;
   attributes: PlayerAttributes;
+  contract: Contract | null;
 }
 
 export interface Club {
@@ -48,12 +58,7 @@ export interface LeagueData {
   id: string;
   name: string;
   country: string;
+  /** Market value multiplier for players in this league (PL = 1.0). */
+  valueCoefficient?: number;
   clubs: Club[];
-}
-
-export interface World {
-  seed: number;
-  league: LeagueData;
-  players: Player[];
-  playersByClub: Map<string, Player[]>;
 }
