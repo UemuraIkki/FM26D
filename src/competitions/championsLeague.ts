@@ -6,6 +6,7 @@ import type { ClubDecisionMaker } from "../decision/clubDecisionMaker.js";
 import { simulateMatch, type EngineParams, type MatchResult, type TeamSheet } from "../engine/index.js";
 import { WORLD_ACCOUNT } from "../finance/ledger.js";
 import { applyMatchMorale, applyMoraleToSheet } from "../morale/morale.js";
+import { applyFitnessToSheet, applyMatchFitnessCost, availableSquad } from "../model/fitness.js";
 import type { RoleBook } from "../model/roles.js";
 import { generateSquad } from "../model/playerGen.js";
 import type { Club, Player } from "../model/types.js";
@@ -199,28 +200,42 @@ export class ChampionsLeague {
     return nextWeekday({ year: this.startYear + 1, month: 5, day: 24 }, 6);
   }
 
-  private sheetFor(clubId: string): TeamSheet {
+  /**
+   * Falls back to the full unfiltered squad if injuries have thinned a
+   * position band below what `selectStartingXI` needs (requirement 4.4;
+   * same safety net as src/sim/season.ts's selectLineupSafe).
+   */
+  private sheetFor(clubId: string, date: SimDate): TeamSheet {
     const real = this.world.clubsById.has(clubId);
     if (real) {
       const brain = this.brains.get(clubId);
-      const squad = getSquad(this.world, clubId);
-      const sheet = brain
-        ? brain.selectLineup({ squad, roleBook: this.roleBook, formation: this.roleBook.defaultFormation })
-        : selectStartingXI(clubId, squad, this.roleBook);
-      return applyMoraleToSheet(this.world, sheet);
+      const build = (squad: readonly Player[]) =>
+        brain
+          ? brain.selectLineup({ squad, roleBook: this.roleBook, formation: this.roleBook.defaultFormation })
+          : selectStartingXI(clubId, squad, this.roleBook);
+      let sheet: TeamSheet;
+      try {
+        sheet = build(availableSquad(this.world, clubId, date));
+      } catch {
+        sheet = build(getSquad(this.world, clubId));
+      }
+      return applyFitnessToSheet(this.world, applyMoraleToSheet(this.world, sheet));
     }
     const squad = this.abstractSquads.get(clubId);
     if (!squad) throw new Error(`no squad for CL entrant: ${clubId}`);
-    return selectStartingXI(clubId, squad, this.roleBook);
+    return applyFitnessToSheet(this.world, selectStartingXI(clubId, squad, this.roleBook));
   }
 
   private playMatch(match: CLMatch): void {
     const rng = deriveRng(this.world.seed, `match:${match.id}`);
-    const home = this.sheetFor(match.homeId);
-    const away = this.sheetFor(match.awayId);
+    const home = this.sheetFor(match.homeId, match.date);
+    const away = this.sheetFor(match.awayId, match.date);
     const result = simulateMatch(home, away, rng, this.engineParams);
     match.result = result;
 
+    for (const sheet of [home, away]) {
+      applyMatchFitnessCost(this.world, sheet, match.date, { matchId: match.id });
+    }
     for (const [clubId, sheet, goalsFor, goalsAgainst] of [
       [match.homeId, home, result.homeGoals, result.awayGoals],
       [match.awayId, away, result.awayGoals, result.homeGoals],

@@ -89,7 +89,12 @@ export class AIDecisionMaker implements ClubDecisionMaker {
   }
 
   respondToOffer(context: SquadContext, player: Player, offeredFee: number): boolean {
-    return offeredFee >= this.askingFeeFor(context, player);
+    if (offeredFee < this.askingFeeFor(context, player)) return false;
+    // Never sell below the minimum needed to field a starting XI: a role
+    // with only `slots` eligible players left (post-sale) can't lose one.
+    const afterSale = context.squad.filter((p) => p.id !== player.id);
+    const chart = buildDepthChart(this.clubId, afterSale, context.roleBook, context.formation);
+    return chart.roles.every((rd) => rd.depth.length >= rd.slots);
   }
 
   /** Renewal policy at contract expiry: keep anyone the depth chart still needs. */

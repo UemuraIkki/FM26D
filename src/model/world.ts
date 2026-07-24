@@ -2,8 +2,10 @@ import { deriveRng } from "../core/rng.js";
 import { Ledger } from "../finance/ledger.js";
 import { playerAbility, wageFor } from "../finance/value.js";
 import type { PlayerMorale } from "../morale/morale.js";
+import { initialFitness, type PlayerFitness } from "./fitness.js";
 import { generateManagers, type Manager } from "./manager.js";
 import { loadLeague } from "./loader.js";
+import { pickNationality } from "./nationality.js";
 import { generateSquad } from "./playerGen.js";
 import type { Club, LeagueData, Player } from "./types.js";
 
@@ -40,6 +42,10 @@ export interface World {
   boardConfidence: Map<string, number>;
   /** Final club order per league from the previous season (CL qualification). */
   lastSeasonPositions?: Map<string, string[]>;
+  /** Fitness/injury state per player (requirement 4.4). */
+  fitnessByPlayer: Map<string, PlayerFitness>;
+  /** International caps per player (requirement 6.4 groundwork). */
+  capsByPlayer: Map<string, number>;
   /** Calendar year world creation; used to seed contract end-years. */
   foundedYear: number;
 }
@@ -52,6 +58,8 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
   const ledger = new Ledger();
   const moraleByPlayer = new Map<string, PlayerMorale>();
   const atmosphereByClub = new Map<string, number>();
+  const fitnessByPlayer = new Map<string, PlayerFitness>();
+  const capsByPlayer = new Map<string, number>();
 
   for (const path of leaguePaths) {
     const league = loadLeague(path);
@@ -62,17 +70,21 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
       const squad = generateSquad(seed, club);
       const contractRng = deriveRng(seed, `contracts:${club.id}`);
       const moraleRng = deriveRng(seed, `morale:${club.id}`);
+      const nationalityRng = deriveRng(seed, `nationality:${club.id}`);
       for (const player of squad) {
         player.contract = {
           annualWage: wageFor(playerAbility(player)),
           endYear: foundedYear + contractRng.int(1, 4),
         };
+        player.nationality = pickNationality(nationalityRng);
         moraleByPlayer.set(player.id, {
           morale: 55 + moraleRng.int(0, 15),
           satisfaction: 55 + moraleRng.int(0, 10),
           trust: 50 + moraleRng.int(0, 10),
           benchStreak: 0,
         });
+        fitnessByPlayer.set(player.id, initialFitness());
+        capsByPlayer.set(player.id, 0);
       }
       players.push(...squad);
       playersByClub.set(club.id, squad);
@@ -96,6 +108,8 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
     atmosphereByClub,
     managers,
     boardConfidence: new Map(),
+    fitnessByPlayer,
+    capsByPlayer,
     foundedYear,
   };
 }

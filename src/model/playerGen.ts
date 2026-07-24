@@ -92,6 +92,7 @@ export function generateSquad(worldSeed: number, club: Club): Player[] {
         age: rng.int(config.ageRange[0], config.ageRange[1]),
         attributes: generateAttributes(rng, config, base, position),
         contract: null, // assigned by buildWorld
+        nationality: "", // assigned by buildWorld
       });
     }
   }

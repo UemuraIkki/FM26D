@@ -1,6 +1,8 @@
 import { addDays, compareDates, toIso, type SimDate } from "../core/calendar.js";
 import { BoardSystem, managerMultiplier, type ManagerChange } from "../board/board.js";
 import { ChampionsLeague, type CLReport } from "../competitions/championsLeague.js";
+import { InternationalWindows } from "../competitions/internationalWindow.js";
+import { InternationalTournament, tournamentKindFor, type TournamentReport } from "../competitions/internationalTournament.js";
 import { deriveRng } from "../core/rng.js";
 import type { ClubDecisionMaker } from "../decision/clubDecisionMaker.js";
 import { AIDecisionMaker } from "../decision/aiDecisionMaker.js";
@@ -14,7 +16,8 @@ import {
   processContractExpiries,
 } from "../finance/economy.js";
 import { StandingsTable } from "../league/standings.js";
-import { getRoleBook, type RoleBook } from "../model/roles.js";
+import { applyFitnessToSheet, applyMatchFitnessCost, availableSquad, fitnessDailyTick } from "../model/fitness.js";
+import { getRoleBook, type Formation, type RoleBook } from "../model/roles.js";
 import { exitUnsignedFreeAgents, supplyShadowProspects } from "../model/shadow.js";
 import { getSquad, type World } from "../model/world.js";
 import { applyMatchMorale, applyMoraleToSheet, moraleDailyTick } from "../morale/morale.js";
@@ -41,6 +44,12 @@ export interface SeasonReport {
   contractSummary: { renewed: number; released: number };
   /** Champions League summary; undefined when the world has fewer than 2 leagues. */
   championsLeague?: CLReport;
+  /** World Cup summary; only present in a WC year (startYear % 4 === 2). */
+  worldCup?: TournamentReport;
+  /** EURO summary; only present in a EURO year (startYear % 4 === 0). */
+  euro?: TournamentReport;
+  /** In-season international friendly windows (requirement 2.2). */
+  internationalWindows: { matches: number; injuries: number };
   /** Shadow-world flows (requirement 2.3). */
   shadow: { arrivals: number; departures: number };
 }
@@ -62,6 +71,8 @@ export interface SeasonOptions {
   transfersEnabled?: boolean;
   /** Champions League on/off; default: on when 2+ leagues are simulated. */
   championsLeagueEnabled?: boolean;
+  /** International windows + World Cup/EURO on/off; default: on when 2+ leagues are simulated. */
+  internationalEnabled?: boolean;
   /** Called after each simulated league match. */
   onMatch?: (played: PlayedMatch) => void;
   /**
@@ -87,6 +98,7 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
   const roleBook = options.roleBook ?? getRoleBook();
   const transfersEnabled = options.transfersEnabled !== false;
   const clEnabled = options.championsLeagueEnabled ?? world.leagues.length >= 2;
+  const internationalEnabled = options.internationalEnabled ?? world.leagues.length >= 2;
 
   const allClubIds: string[] = [];
   for (const league of world.leagues) for (const club of league.clubs) allClubIds.push(club.id);
@@ -132,6 +144,11 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
     startYear + 1,
   );
   const cl = clEnabled ? new ChampionsLeague(world, roleBook, brains, startYear, options.engineParams) : null;
+  const tournamentKind = internationalEnabled ? tournamentKindFor(startYear) : null;
+  const tournament = tournamentKind
+    ? new InternationalTournament(world, roleBook, tournamentKind, startYear, options.engineParams)
+    : null;
+  const windows = internationalEnabled ? new InternationalWindows(world, roleBook, startYear, options.engineParams) : null;
 
   const matches: PlayedMatch[] = [];
   let lastDate = runs.reduce((max, r) => (compareDates(r.lastDate, max) > 0 ? r.lastDate : max), runs[0]!.lastDate);
@@ -141,25 +158,28 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
   const broadcastDay = toIso({ year: startYear, month: 8, day: 1 });
   while (compareDates(day, lastDate) <= 0) {
     moraleDailyTick(world);
+    fitnessDailyTick(world, day);
     payMonthlyWages(world, day, allClubIds);
     if (toIso(day) === broadcastDay) {
       for (const run of runs) payBroadcastBase(world, day, run.clubIds, run.broadcastBase);
     }
     if (transfersEnabled) market.processDay(day, allClubIds);
     cl?.processDay(day);
+    tournament?.processDay(day);
+    windows?.processDay(day);
 
     for (const run of runs) {
       const todays = run.byDate.get(toIso(day));
       if (!todays) continue;
       for (const fixture of todays) {
         const context = { roleBook, formation: roleBook.defaultFormation };
-        const home = brains.get(fixture.homeClubId)!.selectLineup({ ...context, squad: getSquad(world, fixture.homeClubId) });
-        const away = brains.get(fixture.awayClubId)!.selectLineup({ ...context, squad: getSquad(world, fixture.awayClubId) });
+        const home = selectLineupSafe(world, brains.get(fixture.homeClubId)!, context, fixture.homeClubId, day);
+        const away = selectLineupSafe(world, brains.get(fixture.awayClubId)!, context, fixture.awayClubId, day);
         const rng = deriveRng(world.seed, `match:${fixture.id}`);
-        // Morale (±5%) and manager quality (±2%) scale match-day ability.
+        // Morale (±5%), fitness (±5%) and manager quality (±2%) scale match-day ability.
         const result = simulateMatch(
-          scaleSheet(applyMoraleToSheet(world, home), managerMultiplier(world, fixture.homeClubId)),
-          scaleSheet(applyMoraleToSheet(world, away), managerMultiplier(world, fixture.awayClubId)),
+          scaleSheet(applyFitnessToSheet(world, applyMoraleToSheet(world, home)), managerMultiplier(world, fixture.homeClubId)),
+          scaleSheet(applyFitnessToSheet(world, applyMoraleToSheet(world, away)), managerMultiplier(world, fixture.awayClubId)),
           rng,
           options.engineParams,
         );
@@ -169,6 +189,8 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
         const awayOutcome = homeOutcome === "WIN" ? "LOSS" : homeOutcome === "LOSS" ? "WIN" : "DRAW";
         applyMatchMorale(world, fixture.homeClubId, home, homeOutcome);
         applyMatchMorale(world, fixture.awayClubId, away, awayOutcome);
+        applyMatchFitnessCost(world, home, day, { matchId: fixture.id });
+        applyMatchFitnessCost(world, away, day, { matchId: fixture.id });
         const sorted = run.table.sorted();
         run.board.reviewAfterMatch(day, fixture.homeClubId, homeOutcome, sorted);
         run.board.reviewAfterMatch(day, fixture.awayClubId, awayOutcome, sorted);
@@ -214,10 +236,35 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
     refusals: market.refusals,
     managerChanges,
     contractSummary,
+    internationalWindows: windows?.summary ?? { matches: 0, injuries: 0 },
     shadow: { arrivals, departures },
   };
   if (cl) report.championsLeague = cl.report;
+  if (tournament) {
+    if (tournamentKind === "WORLD_CUP") report.worldCup = tournament.report;
+    else report.euro = tournament.report;
+  }
   return report;
+}
+
+/**
+ * Lineup selection with an injury-availability filter (requirement 4.4);
+ * falls back to the full unfiltered squad if injuries have thinned a
+ * position band below what `selectStartingXI` needs, so a cluster of
+ * injuries can never crash the season.
+ */
+function selectLineupSafe(
+  world: World,
+  brain: ClubDecisionMaker,
+  context: { roleBook: RoleBook; formation: Formation },
+  clubId: string,
+  date: SimDate,
+): TeamSheet {
+  try {
+    return brain.selectLineup({ ...context, squad: availableSquad(world, clubId, date) });
+  } catch {
+    return brain.selectLineup({ ...context, squad: getSquad(world, clubId) });
+  }
 }
 
 /** Uniformly scale a sheet's attributes (bounded factors only). */

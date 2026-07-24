@@ -44,6 +44,8 @@ export interface Player {
   age: number;
   attributes: PlayerAttributes;
   contract: Contract | null;
+  /** Nation id (data/nationalities.json); drives national-team call-ups. */
+  nationality: string;
 }
 
 export interface Club {

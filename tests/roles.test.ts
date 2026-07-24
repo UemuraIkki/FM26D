@@ -15,7 +15,10 @@ function makePlayer(id: string, position: Player["position"], attrs: Partial<Pla
     decisions: 50, positioning: 50, finishing: 50, ambition: 50, professionalism: 50,
     shotStopping: 10, aerialHandling: 10, distribution: 10,
   };
-  return { id, name: id, clubId: "T", position, age: 25, attributes: { ...base, ...attrs }, contract: null };
+  return {
+    id, name: id, clubId: "T", position, age: 25,
+    attributes: { ...base, ...attrs }, contract: null, nationality: "ENG",
+  };
 }
 
 describe("role book", () => {

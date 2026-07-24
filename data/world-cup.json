@@ -1,0 +1,17 @@
+{
+  "id": "WC",
+  "name": "FIFA World Cup",
+  "groupCount": 8,
+  "groupSize": 4,
+  "participants": [
+    "ENG", "ESP", "GER", "ITA", "FRA",
+    "BRA", "ARG", "POR", "NED", "BEL", "CRO", "URU", "COL",
+    "USA", "MEX",
+    "JPN",
+    "MAR", "SEN", "NGA", "GHA",
+    "POL", "SRB", "DEN", "SWE", "SUI", "AUT", "SCO", "WAL", "IRL", "TUR", "UKR"
+  ],
+  "abstractNations": [
+    { "id": "WC-QAT", "name": "Qatar", "strength": 66 }
+  ]
+}

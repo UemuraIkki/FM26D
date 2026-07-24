@@ -1,0 +1,17 @@
+{
+  "id": "EURO",
+  "name": "UEFA European Championship",
+  "groupCount": 8,
+  "groupSize": 3,
+  "participants": [
+    "ENG", "ESP", "GER", "ITA", "FRA",
+    "POR", "NED", "BEL", "CRO",
+    "POL", "SRB", "DEN", "SWE", "SUI", "AUT", "SCO", "WAL", "IRL", "TUR", "UKR"
+  ],
+  "abstractNations": [
+    { "id": "EURO-ISL", "name": "Iceland", "strength": 68 },
+    { "id": "EURO-HUN", "name": "Hungary", "strength": 70 },
+    { "id": "EURO-CZE", "name": "Czechia", "strength": 71 },
+    { "id": "EURO-NOR", "name": "Norway", "strength": 72 }
+  ]
+}

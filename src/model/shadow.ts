@@ -1,4 +1,6 @@
 import { deriveRng } from "../core/rng.js";
+import { initialFitness } from "./fitness.js";
+import { pickNationality } from "./nationality.js";
 import type { World } from "./world.js";
 import type { Player, PlayerAttributes, Position } from "./types.js";
 
@@ -58,11 +60,14 @@ export function supplyShadowProspects(world: World, year: number, count = 40): P
       age: 18 + rng.int(0, 10),
       attributes,
       contract: null,
+      nationality: pickNationality(rng),
     };
     arrivals.push(player);
     world.players.push(player);
     world.freeAgents.push(player);
     world.moraleByPlayer.set(player.id, { morale: 65, satisfaction: 55, trust: 55, benchStreak: 0 });
+    world.fitnessByPlayer.set(player.id, initialFitness());
+    world.capsByPlayer.set(player.id, 0);
   }
   return arrivals;
 }
@@ -79,6 +84,8 @@ export function exitUnsignedFreeAgents(world: World): number {
     const idx = world.players.findIndex((p) => p.id === player.id);
     if (idx >= 0) world.players.splice(idx, 1);
     world.moraleByPlayer.delete(player.id);
+    world.fitnessByPlayer.delete(player.id);
+    world.capsByPlayer.delete(player.id);
   }
   world.freeAgents.length = 0;
   return leaving;

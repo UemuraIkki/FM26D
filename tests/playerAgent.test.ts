@@ -17,6 +17,7 @@ function makePlayer(ambition: number): Player {
     id: "p1", name: "Test Player", clubId: "MID", position: "MF", age: 26,
     attributes: base,
     contract: { annualWage: 4, endYear: 2029 },
+    nationality: "ENG",
   };
 }
 
