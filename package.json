@@ -5,7 +5,7 @@
   "description": "Football league observation simulator (FM26D) - headless CLI",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -13,7 +13,12 @@
     "test": "vitest run",
     "season": "tsx src/cli/main.ts season",
     "calibrate": "tsx src/cli/main.ts calibrate",
-    "depth": "tsx src/cli/main.ts depth"
+    "depth": "tsx src/cli/main.ts depth",
+    "play": "tsx src/cli/main.ts play",
+    "feed": "tsx src/cli/main.ts feed",
+    "watch": "tsx src/cli/main.ts watch",
+    "unwatch": "tsx src/cli/main.ts unwatch",
+    "watchlist": "tsx src/cli/main.ts watchlist"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

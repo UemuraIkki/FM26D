@@ -1,13 +1,25 @@
 import { getRoleBook } from "../model/roles.js";
-import { buildWorld, getSquad } from "../model/world.js";
+import { buildWorld, getSquad, type World } from "../model/world.js";
 import { runSeason } from "../sim/season.js";
 import { buildDepthChart } from "../squad/depthChart.js";
 import { CalibrationAccumulator, computeCalibration, CALIBRATION_TARGETS } from "../stats/calibration.js";
+import { deriveNewsFeed } from "../observe/newsFeed.js";
+import { addToWatchlist, removeFromWatchlist, watchlistStatuses } from "../observe/tracking.js";
+import { loadCheckpoint, queryNewsEvents, saveCheckpoint, type NewsEventQuery } from "../persist/checkpoint.js";
 
 /**
- * Headless CLI (Phase A).
+ * Headless CLI (Phase A; observation commands added Phase I).
  *   npm run season    -- [--seed 12345] [--year 2026]
  *   npm run calibrate -- [--seasons 50] [--seed 1]
+ *   npm run play      -- [--seed N] --seasons N [--until YEAR] --db <path> [--resume]
+ *   npm run feed      -- --db <path> [--player ID] [--type TYPE] [--limit N]
+ *   npm run watch     -- --db <path> --player ID
+ *   npm run unwatch   -- --db <path> --player ID
+ *   npm run watchlist -- --db <path>
+ *
+ * `play`'s checkpoints are season-granularity, not day-granularity (see the
+ * Phase I plan / README) — "指定日到達での自動一時停止" (--until) stops
+ * once a season boundary reaches the target year, not an arbitrary day.
  */
 
 const LEAGUE_PATH = "data/leagues/premier-league.json";
@@ -122,11 +134,112 @@ function commandDepth(): void {
   }
 }
 
+function commandPlay(): void {
+  const seed = argValue("seed", 20260808);
+  const seasons = argValue("seasons", 1);
+  const untilStr = argString("until");
+  const until = untilStr !== undefined ? Number(untilStr) : undefined;
+  const dbPath = argString("db") ?? "fm26d.sqlite";
+  const resume = process.argv.includes("--resume");
+
+  let world: World;
+  let startYear: number;
+  if (resume) {
+    const loaded = loadCheckpoint(dbPath);
+    if (!loaded) {
+      console.log(`no checkpoint found at ${dbPath}`);
+      process.exit(1);
+    }
+    world = loaded.world;
+    startYear = loaded.nextStartYear;
+    console.log(`resumed from ${dbPath}: next season ${startYear}`);
+  } else {
+    world = buildWorld(seed, [LEAGUE_PATH]);
+    startYear = 2026;
+    console.log(`new world seed=${seed}, starting ${startYear}, saving to ${dbPath}`);
+  }
+
+  let seasonsRun = 0;
+  while (seasonsRun < seasons && (until === undefined || startYear <= until)) {
+    const prevCaps = new Map(world.capsByPlayer);
+    const prevApps = new Map(world.appearancesByPlayer);
+    const report = runSeason(world, { startYear, keepMatches: false });
+    const events = deriveNewsFeed(report, world, prevCaps, prevApps);
+    saveCheckpoint(dbPath, world, startYear + 1, events);
+    console.log(`season ${startYear}: champion=${report.table.sorted()[0]?.clubId ?? "?"}  events=${events.length}  checkpoint saved`);
+    startYear += 1;
+    seasonsRun += 1;
+  }
+  console.log(`\nplay finished: ${seasonsRun} season(s) run; resume with --resume to continue from season ${startYear}`);
+}
+
+function commandFeed(): void {
+  const dbPath = argString("db") ?? "fm26d.sqlite";
+  const player = argString("player");
+  const type = argString("type");
+  const limit = argValue("limit", 50);
+  const query: NewsEventQuery = { limit };
+  if (player) query.playerId = player;
+  if (type) query.type = type;
+
+  const events = queryNewsEvents(dbPath, query);
+  if (events.length === 0) console.log("(no events)");
+  for (const e of events) console.log(`${e.date}  [${e.type}]  ${e.summary}`);
+}
+
+function commandWatchToggle(add: boolean): void {
+  const dbPath = argString("db") ?? "fm26d.sqlite";
+  const playerId = argString("player");
+  if (!playerId) {
+    console.log("usage: watch|unwatch --db <path> --player <id>");
+    process.exit(1);
+  }
+  const loaded = loadCheckpoint(dbPath);
+  if (!loaded) {
+    console.log(`no checkpoint at ${dbPath}`);
+    process.exit(1);
+  }
+  if (add) addToWatchlist(loaded.world, playerId);
+  else removeFromWatchlist(loaded.world, playerId);
+  saveCheckpoint(dbPath, loaded.world, loaded.nextStartYear, []);
+  console.log(`${add ? "watching" : "unwatched"} ${playerId}`);
+}
+
+function commandWatchlist(): void {
+  const dbPath = argString("db") ?? "fm26d.sqlite";
+  const loaded = loadCheckpoint(dbPath);
+  if (!loaded) {
+    console.log(`no checkpoint at ${dbPath}`);
+    process.exit(1);
+  }
+  const statuses = watchlistStatuses(loaded.world);
+  if (statuses.length === 0) {
+    console.log("(watchlist empty)");
+    return;
+  }
+  for (const s of statuses) {
+    if (s.player) {
+      console.log(
+        `${s.playerId}  ${s.player.name.padEnd(24)} ${(s.player.clubId ?? "FA").padEnd(4)}  age ${s.player.age}  ability ${s.ability?.toFixed(1)}  apps ${s.apps}  caps ${s.caps}`,
+      );
+    } else {
+      console.log(`${s.playerId}  ${(s.archived?.aggregate.name ?? "?").padEnd(24)} RETIRED  apps ${s.apps}  caps ${s.caps}  notable=${s.archived?.notable}`);
+    }
+  }
+}
+
 const command = process.argv[2];
 if (command === "season") commandSeason();
 else if (command === "calibrate") commandCalibrate();
 else if (command === "depth") commandDepth();
+else if (command === "play") commandPlay();
+else if (command === "feed") commandFeed();
+else if (command === "watch") commandWatchToggle(true);
+else if (command === "unwatch") commandWatchToggle(false);
+else if (command === "watchlist") commandWatchlist();
 else {
-  console.log("usage: main.ts <season|calibrate|depth> [--seed N] [--year N] [--seasons N] [--club ID]");
+  console.log(
+    "usage: main.ts <season|calibrate|depth|play|feed|watch|unwatch|watchlist> [--seed N] [--year N] [--seasons N] [--club ID] [--db PATH] [--player ID] [--until YEAR] [--resume]",
+  );
   process.exit(1);
 }

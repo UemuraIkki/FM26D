@@ -1,4 +1,5 @@
 import { deriveRng } from "../core/rng.js";
+import type { TeamSheet } from "../engine/index.js";
 import { Ledger } from "../finance/ledger.js";
 import { growthPotential, playerAbility, wageFor } from "../finance/value.js";
 import type { PlayerMorale } from "../morale/morale.js";
@@ -7,7 +8,30 @@ import { generateManagers, type Manager } from "./manager.js";
 import { loadLeague } from "./loader.js";
 import { pickNationality } from "./nationality.js";
 import { generateSquad } from "./playerGen.js";
-import type { Club, LeagueData, Player } from "./types.js";
+import type { Club, LeagueData, Player, Position } from "./types.js";
+
+/**
+ * Retention record for a retired player (requirement 6.4): "notable"
+ * players (100+ club appearances or any international cap) keep full
+ * career detail forever; everyone else keeps only the aggregate once
+ * `purgeExpiredArchives` has dropped `detail` five years post-retirement.
+ */
+export interface RetiredRecord {
+  notable: boolean;
+  retiredYear: number;
+  aggregate: {
+    name: string;
+    position: Position;
+    nationality: string;
+    finalAbility: number;
+    clubApps: number;
+    caps: number;
+  };
+  detail?: Player;
+}
+
+const NOTABLE_APPS_THRESHOLD = 100;
+const ARCHIVE_DETAIL_RETENTION_YEARS = 5;
 
 /**
  * Persistent world state.
@@ -46,6 +70,12 @@ export interface World {
   fitnessByPlayer: Map<string, PlayerFitness>;
   /** International caps per player (requirement 6.4 groundwork). */
   capsByPlayer: Map<string, number>;
+  /** Club + Champions League starts per player (requirement 6.4 notability). */
+  appearancesByPlayer: Map<string, number>;
+  /** Watch-registered player ids for career tracking (requirement 6.3). */
+  watchlist: Set<string>;
+  /** Retired-player retention records (requirement 6.4). */
+  retiredArchive: Map<string, RetiredRecord>;
   /** Calendar year world creation; used to seed contract end-years. */
   foundedYear: number;
 }
@@ -60,6 +90,7 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
   const atmosphereByClub = new Map<string, number>();
   const fitnessByPlayer = new Map<string, PlayerFitness>();
   const capsByPlayer = new Map<string, number>();
+  const appearancesByPlayer = new Map<string, number>();
 
   for (const path of leaguePaths) {
     const league = loadLeague(path);
@@ -88,6 +119,7 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
         });
         fitnessByPlayer.set(player.id, initialFitness());
         capsByPlayer.set(player.id, 0);
+        appearancesByPlayer.set(player.id, 0);
       }
       players.push(...squad);
       playersByClub.set(club.id, squad);
@@ -113,6 +145,9 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
     boardConfidence: new Map(),
     fitnessByPlayer,
     capsByPlayer,
+    appearancesByPlayer,
+    watchlist: new Set(),
+    retiredArchive: new Map(),
     foundedYear,
   };
 }
@@ -166,14 +201,35 @@ export function releasePlayer(world: World, playerId: string): void {
 
 /**
  * Permanently remove a player (retirement, requirement 4.3) — distinct from
- * `releasePlayer`, which keeps them signable as a free agent. Cleans up
- * every per-player map alongside the roster/free-agent indices so nothing
- * dangling survives a retiree.
+ * `releasePlayer`, which keeps them signable as a free agent. Archives a
+ * retention record (requirement 6.4) before removing, then cleans up every
+ * per-player map alongside the roster/free-agent indices so nothing
+ * dangling survives a retiree. Archiving lives here (not at the call site)
+ * so "nothing dangling survives a retiree" stays true from one place, even
+ * if a second retirement call site is ever added.
  */
-export function retirePlayer(world: World, playerId: string): void {
+export function retirePlayer(world: World, playerId: string, retiredYear: number): void {
   const idx = world.players.findIndex((p) => p.id === playerId);
   if (idx < 0) throw new Error(`unknown player: ${playerId}`);
   const player = world.players[idx]!;
+
+  const clubApps = world.appearancesByPlayer.get(playerId) ?? 0;
+  const caps = world.capsByPlayer.get(playerId) ?? 0;
+  const notable = clubApps >= NOTABLE_APPS_THRESHOLD || caps >= 1;
+  world.retiredArchive.set(playerId, {
+    notable,
+    retiredYear,
+    aggregate: {
+      name: player.name,
+      position: player.position,
+      nationality: player.nationality,
+      finalAbility: playerAbility(player),
+      clubApps,
+      caps,
+    },
+    detail: { ...player, attributes: { ...player.attributes } },
+  });
+
   if (player.clubId !== null) {
     const squad = world.playersByClub.get(player.clubId);
     if (squad) {
@@ -188,4 +244,33 @@ export function retirePlayer(world: World, playerId: string): void {
   world.moraleByPlayer.delete(playerId);
   world.fitnessByPlayer.delete(playerId);
   world.capsByPlayer.delete(playerId);
+  world.appearancesByPlayer.delete(playerId);
+  // watchlist is NOT cleared here: a retiree is archived (above), so a
+  // watched player keeps being trackable (requirement 6.3) via their
+  // retiredArchive record instead of vanishing from the list.
+}
+
+/**
+ * Season-end retention sweep (requirement 6.4): non-notable retirees lose
+ * their full career detail five years after retiring — the aggregate stays
+ * forever either way.
+ */
+export function purgeExpiredArchives(world: World, currentYear: number): void {
+  for (const record of world.retiredArchive.values()) {
+    if (!record.notable && record.detail && currentYear - record.retiredYear >= ARCHIVE_DETAIL_RETENTION_YEARS) {
+      delete record.detail;
+    }
+  }
+}
+
+/**
+ * Club/Champions League appearance tracking (requirement 6.4 notability).
+ * Synthetic/abstract players (no tracked entry, e.g. CL abstract-club or
+ * national-team fill squads) are silently skipped.
+ */
+export function recordAppearance(world: World, sheet: TeamSheet): void {
+  for (const p of sheet.players) {
+    if (!world.appearancesByPlayer.has(p.id)) continue;
+    world.appearancesByPlayer.set(p.id, (world.appearancesByPlayer.get(p.id) ?? 0) + 1);
+  }
 }

@@ -3,7 +3,7 @@ import { deriveRng } from "../core/rng.js";
 import { playerAbility } from "../finance/value.js";
 import type { RoleBook } from "./roles.js";
 import type { Player, PlayerAttributes } from "./types.js";
-import { retirePlayer } from "./world.js";
+import { purgeExpiredArchives, retirePlayer } from "./world.js";
 import type { World } from "./world.js";
 import { ensurePositionCoverage, generateYouthIntake } from "./youth.js";
 
@@ -71,21 +71,30 @@ function retirementChance(age: number): number {
  * club take in its next academy intake (src/model/youth.ts) to keep the
  * player pool from running dry over many seasons.
  */
+export interface RetiredPlayerSummary {
+  id: string;
+  name: string;
+  notable: boolean;
+}
+
 export function processSeasonEndDevelopment(
   world: World,
   seasonLabel: string,
   seasonEndYear: number,
   clubIds: readonly string[],
   roleBook: RoleBook,
-): { aged: number; retired: number; rookies: number } {
+): { aged: number; retired: number; rookies: number; retiredPlayers: RetiredPlayerSummary[] } {
   const rng = deriveRng(world.seed, `develop:${seasonLabel}`);
   let retired = 0;
   let aged = 0;
+  const retiredPlayers: RetiredPlayerSummary[] = [];
   for (const player of [...world.players]) {
     developPlayer(player, rng);
     aged++;
     if (rng.chance(retirementChance(player.age))) {
-      retirePlayer(world, player.id);
+      const { id, name } = player;
+      retirePlayer(world, id, seasonEndYear);
+      retiredPlayers.push({ id, name, notable: world.retiredArchive.get(id)!.notable });
       retired++;
     }
   }
@@ -99,5 +108,7 @@ export function processSeasonEndDevelopment(
     rookies += ensurePositionCoverage(world, clubId, seasonLabel, seasonEndYear, roleBook).length;
   }
 
-  return { aged, retired, rookies };
+  purgeExpiredArchives(world, seasonEndYear);
+
+  return { aged, retired, rookies, retiredPlayers };
 }

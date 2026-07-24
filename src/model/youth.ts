@@ -76,6 +76,7 @@ function createProspect(
   world.moraleByPlayer.set(player.id, { morale: 60, satisfaction: 55, trust: 55, benchStreak: 0 });
   world.fitnessByPlayer.set(player.id, initialFitness());
   world.capsByPlayer.set(player.id, 0);
+  world.appearancesByPlayer.set(player.id, 0);
   return player;
 }
 

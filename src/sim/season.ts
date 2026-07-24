@@ -16,11 +16,11 @@ import {
   processContractExpiries,
 } from "../finance/economy.js";
 import { StandingsTable } from "../league/standings.js";
-import { processSeasonEndDevelopment } from "../model/development.js";
+import { processSeasonEndDevelopment, type RetiredPlayerSummary } from "../model/development.js";
 import { applyFitnessToSheet, applyMatchFitnessCost, availableSquad, fitnessDailyTick } from "../model/fitness.js";
 import { getRoleBook, type Formation, type RoleBook } from "../model/roles.js";
 import { exitUnsignedFreeAgents, supplyShadowProspects } from "../model/shadow.js";
-import { getSquad, type World } from "../model/world.js";
+import { getSquad, recordAppearance, type World } from "../model/world.js";
 import { applyMatchMorale, applyMoraleToSheet, moraleDailyTick } from "../morale/morale.js";
 import { fixturesByDate, generateSeasonFixtures, type Fixture } from "../schedule/fixtures.js";
 import { TransferMarket, type RefusalRecord, type TransferRecord } from "../transfer/market.js";
@@ -44,7 +44,9 @@ export interface SeasonReport {
   managerChanges: ManagerChange[];
   contractSummary: { renewed: number; released: number };
   /** Aging, retirement and academy intake (requirement 4.3). */
-  development: { aged: number; retired: number; rookies: number };
+  development: { aged: number; retired: number; rookies: number; retiredPlayers: RetiredPlayerSummary[] };
+  /** Final day reached by the daily loop — anchors season-end news events (requirement 6.1). */
+  seasonEndDate: SimDate;
   /** Champions League summary; undefined when the world has fewer than 2 leagues. */
   championsLeague?: CLReport;
   /** World Cup summary; only present in a WC year (startYear % 4 === 2). */
@@ -196,6 +198,8 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
         applyMatchMorale(world, fixture.awayClubId, away, awayOutcome);
         applyMatchFitnessCost(world, home, day, { matchId: fixture.id });
         applyMatchFitnessCost(world, away, day, { matchId: fixture.id });
+        recordAppearance(world, home);
+        recordAppearance(world, away);
         const sorted = run.table.sorted();
         run.board.reviewAfterMatch(day, fixture.homeClubId, homeOutcome, sorted);
         run.board.reviewAfterMatch(day, fixture.awayClubId, awayOutcome, sorted);
@@ -235,7 +239,7 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
   const developmentEnabled = options.developmentEnabled !== false;
   const development = developmentEnabled
     ? processSeasonEndDevelopment(world, seasonLabel, startYear + 1, allClubIds, roleBook)
-    : { aged: 0, retired: 0, rookies: 0 };
+    : { aged: 0, retired: 0, rookies: 0, retiredPlayers: [] };
 
   const report: SeasonReport = {
     seasonLabel,
@@ -247,6 +251,7 @@ export function runSeason(world: World, options: SeasonOptions): SeasonReport {
     managerChanges,
     contractSummary,
     development,
+    seasonEndDate: day,
     internationalWindows: windows?.summary ?? { matches: 0, injuries: 0 },
     shadow: { arrivals, departures },
   };

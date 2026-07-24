@@ -72,15 +72,17 @@ export function supplyShadowProspects(world: World, year: number, count = 40): P
     world.moraleByPlayer.set(player.id, { morale: 65, satisfaction: 55, trust: 55, benchStreak: 0 });
     world.fitnessByPlayer.set(player.id, initialFitness());
     world.capsByPlayer.set(player.id, 0);
+    world.appearancesByPlayer.set(player.id, 0);
   }
   return arrivals;
 }
 
 /**
  * Season-end outflow: unsigned free agents leave for the shadow world.
- * They are removed from the market and the active player list; requirement
- * 6.4 data retention (keep aggregates for notable careers) arrives with the
- * history phase.
+ * They are removed from the market and the active player list. Requirement
+ * 6.4's retention archive only covers retirement (src/model/world.ts's
+ * retirePlayer) — leaving for the shadow world is a different exit (moving
+ * to an unsimulated league, not ending a career), so it isn't archived.
  */
 export function exitUnsignedFreeAgents(world: World): number {
   const leaving = world.freeAgents.length;
@@ -90,6 +92,8 @@ export function exitUnsignedFreeAgents(world: World): number {
     world.moraleByPlayer.delete(player.id);
     world.fitnessByPlayer.delete(player.id);
     world.capsByPlayer.delete(player.id);
+    world.appearancesByPlayer.delete(player.id);
+    world.watchlist.delete(player.id);
   }
   world.freeAgents.length = 0;
   return leaving;

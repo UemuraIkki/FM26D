@@ -10,7 +10,7 @@ import { applyFitnessToSheet, applyMatchFitnessCost, availableSquad } from "../m
 import type { RoleBook } from "../model/roles.js";
 import { generateSquad } from "../model/playerGen.js";
 import type { Club, Player } from "../model/types.js";
-import { getSquad, type World } from "../model/world.js";
+import { getSquad, recordAppearance, type World } from "../model/world.js";
 import { selectStartingXI } from "../sim/lineup.js";
 
 /**
@@ -235,6 +235,7 @@ export class ChampionsLeague {
 
     for (const sheet of [home, away]) {
       applyMatchFitnessCost(this.world, sheet, match.date, { matchId: match.id });
+      recordAppearance(this.world, sheet);
     }
     for (const [clubId, sheet, goalsFor, goalsAgainst] of [
       [match.homeId, home, result.homeGoals, result.awayGoals],

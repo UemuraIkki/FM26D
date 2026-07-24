@@ -87,4 +87,21 @@ export class Ledger {
     }
     return { sumBalances, sumInitial, netWorldInflow };
   }
+
+  /** Plain-data snapshot for checkpointing (requirement 6.2/7 SQLite save). */
+  snapshot(): { initial: Array<[string, number]>; transactions: Transaction[] } {
+    return { initial: [...this.initial.entries()], transactions: this.transactions.map((t) => ({ ...t })) };
+  }
+
+  /** Rebuild a Ledger from a snapshot — opening balances then replaying every transaction. */
+  static restore(data: { initial: Array<[string, number]>; transactions: Transaction[] }): Ledger {
+    const ledger = new Ledger();
+    for (const [clubId, balance] of data.initial) ledger.openAccount(clubId, balance);
+    for (const t of data.transactions) {
+      if (t.from !== WORLD_ACCOUNT) ledger.balances.set(t.from, ledger.balanceOf(t.from) - t.amount);
+      if (t.to !== WORLD_ACCOUNT) ledger.balances.set(t.to, ledger.balanceOf(t.to) + t.amount);
+      ledger.transactions.push({ ...t });
+    }
+    return ledger;
+  }
 }
