@@ -1,12 +1,12 @@
 import { addDays, compareDates, toIso, type SimDate } from "../core/calendar.js";
 import { deriveRng } from "../core/rng.js";
+import type { ClubDecisionMaker } from "../decision/clubDecisionMaker.js";
+import { AIDecisionMaker } from "../decision/aiDecisionMaker.js";
 import { simulateMatch, type EngineParams, type MatchResult } from "../engine/index.js";
 import { StandingsTable } from "../league/standings.js";
-import { loadLeague } from "../model/loader.js";
-import { generateSquad } from "../model/playerGen.js";
-import type { Player, World } from "../model/types.js";
+import { getRoleBook, type RoleBook } from "../model/roles.js";
+import { getSquad, type World } from "../model/world.js";
 import { fixturesByDate, generateSeasonFixtures, type Fixture } from "../schedule/fixtures.js";
-import { selectStartingXI } from "./lineup.js";
 
 export interface PlayedMatch {
   fixture: Fixture;
@@ -20,12 +20,19 @@ export interface SeasonReport {
 }
 
 export interface SeasonOptions {
-  leaguePath: string;
-  seed: number;
+  /** League to run (id within world.leagues). Defaults to the first league. */
+  leagueId?: string;
   /** e.g. 2026 → season 2026/27, kicks off mid-August 2026. */
   startYear: number;
   engineParams?: Partial<EngineParams>;
-  /** Called after each simulated day that had matches. */
+  roleBook?: RoleBook;
+  /**
+   * Club brains. Every club decision goes through its ClubDecisionMaker
+   * (absolute constraint, requirement 1). Missing clubs get an
+   * AIDecisionMaker — the future manager mode overrides exactly one entry.
+   */
+  decisionMakers?: ReadonlyMap<string, ClubDecisionMaker>;
+  /** Called after each simulated match. */
   onMatch?: (played: PlayedMatch) => void;
   /**
    * Retain per-match results (with full event logs) in the report.
@@ -35,31 +42,29 @@ export interface SeasonOptions {
   keepMatches?: boolean;
 }
 
-export function buildWorld(seed: number, leaguePath: string): World {
-  const league = loadLeague(leaguePath);
-  const players: Player[] = [];
-  const playersByClub = new Map<string, Player[]>();
-  for (const club of league.clubs) {
-    const squad = generateSquad(seed, club);
-    players.push(...squad);
-    playersByClub.set(club.id, squad);
-  }
-  return { seed, league, players, playersByClub };
-}
-
 /**
- * Run one league season with the daily tick loop (requirement 3.1).
- * Phase A: the only daily systems are fixtures; injuries/morale/contracts hook
- * into the same loop later.
+ * Run one league season with the daily tick loop (requirement 3.1) over a
+ * persistent world. The world is built once by the caller and survives across
+ * seasons so later phases (transfers, contracts, morale) can mutate it.
  */
-export function runSeason(options: SeasonOptions): SeasonReport {
-  const { seed, startYear } = options;
-  const world = buildWorld(seed, options.leaguePath);
-  const seasonLabel = `${world.league.id}-${startYear}`;
-  const clubIds = world.league.clubs.map((c) => c.id);
+export function runSeason(world: World, options: SeasonOptions): SeasonReport {
+  const { startYear } = options;
+  const league = options.leagueId
+    ? world.leagues.find((l) => l.id === options.leagueId)
+    : world.leagues[0];
+  if (!league) throw new Error(`league not found: ${options.leagueId ?? "(none loaded)"}`);
+
+  const seasonLabel = `${league.id}-${startYear}`;
+  const clubIds = league.clubs.map((c) => c.id);
+  const roleBook = options.roleBook ?? getRoleBook();
+
+  const brains = new Map<string, ClubDecisionMaker>();
+  for (const id of clubIds) {
+    brains.set(id, options.decisionMakers?.get(id) ?? new AIDecisionMaker(id));
+  }
 
   const seasonStart: SimDate = { year: startYear, month: 8, day: 8 };
-  const fixtures = generateSeasonFixtures(seed, seasonLabel, clubIds, seasonStart);
+  const fixtures = generateSeasonFixtures(world.seed, seasonLabel, clubIds, seasonStart);
   const byDate = fixturesByDate(fixtures);
   const lastDate = fixtures.reduce((max, f) => (compareDates(f.date, max) > 0 ? f.date : max), fixtures[0]!.date);
 
@@ -71,11 +76,10 @@ export function runSeason(options: SeasonOptions): SeasonReport {
     const todays = byDate.get(toIso(day));
     if (todays) {
       for (const fixture of todays) {
-        const homeSquad = world.playersByClub.get(fixture.homeClubId)!;
-        const awaySquad = world.playersByClub.get(fixture.awayClubId)!;
-        const home = selectStartingXI(fixture.homeClubId, homeSquad);
-        const away = selectStartingXI(fixture.awayClubId, awaySquad);
-        const rng = deriveRng(seed, `match:${fixture.id}`);
+        const context = { roleBook, formation: roleBook.defaultFormation };
+        const home = brains.get(fixture.homeClubId)!.selectLineup({ ...context, squad: getSquad(world, fixture.homeClubId) });
+        const away = brains.get(fixture.awayClubId)!.selectLineup({ ...context, squad: getSquad(world, fixture.awayClubId) });
+        const rng = deriveRng(world.seed, `match:${fixture.id}`);
         const result = simulateMatch(home, away, rng, options.engineParams);
         table.record(fixture.homeClubId, fixture.awayClubId, result.homeGoals, result.awayGoals);
         const played = { fixture, result };

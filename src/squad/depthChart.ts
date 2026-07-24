@@ -1,3 +1,4 @@
+import { compareIds } from "../core/rng.js";
 import type { Player } from "../model/types.js";
 import { isEligible, roleScore, type Formation, type RoleBook } from "../model/roles.js";
 
@@ -5,6 +6,13 @@ import { isEligible, roleScore, type Formation, type RoleBook } from "../model/r
  * Depth chart (requirement 4.2): per formation role, rank eligible players
  * 1st/2nd/3rd by role score, then mechanically detect transfer needs
  * (shortage) and sellable surplus.
+ *
+ * Starter and backup slots are filled by an exclusive draft — one player can
+ * occupy only one slot — so four defenders can no longer satisfy both the CB
+ * and FB requirements simultaneously. Roles draft in scarcity order (fewest
+ * eligible candidates per needed slot first) to avoid starving a role whose
+ * candidates were taken by a more flexible one; ties break on role id for
+ * determinism.
  */
 
 export interface DepthEntry {
@@ -16,8 +24,10 @@ export interface RoleDepth {
   roleId: string;
   /** Number of XI slots using this role. */
   slots: number;
-  /** Eligible players sorted by score, best first. */
+  /** Full eligibility ranking (informational), best first. */
   depth: DepthEntry[];
+  /** Exclusively drafted starters + backups for this role, best first. */
+  assigned: DepthEntry[];
   /** Starters + one backup per slot: slots * 2. */
   required: number;
   shortage: boolean;
@@ -26,10 +36,49 @@ export interface RoleDepth {
 export interface ClubDepthChart {
   clubId: string;
   roles: RoleDepth[];
-  /** Roles where eligible depth < required — transfer targets (5.5 step 1). */
+  /** Roles whose exclusive allocation came up short — transfer targets (5.5 step 1). */
   shortages: RoleDepth[];
-  /** Players outside the top `required` of every role — sale candidates. */
+  /** Players left unassigned by every role — sale candidates. */
   surplus: Player[];
+}
+
+interface DraftRole {
+  roleId: string;
+  slots: number;
+  need: number;
+  assigned: DepthEntry[];
+}
+
+/** One exclusive draft round: each role fills `need` slots from unassigned players. */
+function draftRound(
+  draftRoles: DraftRole[],
+  squad: readonly Player[],
+  assignedIds: Set<string>,
+  book: RoleBook,
+): void {
+  const remaining = draftRoles.map((r) => ({ role: r, toFill: r.need }));
+  while (remaining.some((r) => r.toFill > 0)) {
+    // Scarcity order, recomputed as players get taken.
+    const open = remaining.filter((r) => r.toFill > 0);
+    open.sort((a, b) => {
+      const roleA = book.rolesById.get(a.role.roleId)!;
+      const roleB = book.rolesById.get(b.role.roleId)!;
+      const candA = squad.filter((p) => !assignedIds.has(p.id) && isEligible(p, roleA)).length;
+      const candB = squad.filter((p) => !assignedIds.has(p.id) && isEligible(p, roleB)).length;
+      return candA / a.toFill - candB / b.toFill || compareIds(a.role.roleId, b.role.roleId);
+    });
+    const current = open[0]!;
+    const role = book.rolesById.get(current.role.roleId)!;
+    const candidates = squad
+      .filter((p) => !assignedIds.has(p.id) && isEligible(p, role))
+      .map((player) => ({ player, score: roleScore(player, role) }))
+      .sort((a, b) => b.score - a.score || compareIds(a.player.id, b.player.id));
+    const best = candidates[0];
+    current.toFill--;
+    if (!best) continue; // shortage — leave the slot unfilled
+    assignedIds.add(best.player.id);
+    current.role.assigned.push(best);
+  }
 }
 
 export function buildDepthChart(
@@ -43,22 +92,36 @@ export function buildDepthChart(
     slotCounts.set(slot, (slotCounts.get(slot) ?? 0) + 1);
   }
 
-  const roles: RoleDepth[] = [];
-  const usedPlayerIds = new Set<string>();
+  const draftRoles: DraftRole[] = [...slotCounts].map(([roleId, slots]) => ({
+    roleId,
+    slots,
+    need: slots,
+    assigned: [],
+  }));
+  const assignedIds = new Set<string>();
 
-  for (const [roleId, slots] of slotCounts) {
-    const role = book.rolesById.get(roleId);
-    if (!role) throw new Error(`unknown role in formation: ${roleId}`);
+  // Round 1: starters. Round 2: one backup per slot.
+  draftRound(draftRoles, squad, assignedIds, book);
+  draftRound(draftRoles, squad, assignedIds, book);
+
+  const roles: RoleDepth[] = draftRoles.map((dr) => {
+    const role = book.rolesById.get(dr.roleId)!;
     const depth = squad
       .filter((p) => isEligible(p, role))
       .map((player) => ({ player, score: roleScore(player, role) }))
-      .sort((a, b) => b.score - a.score || a.player.id.localeCompare(b.player.id));
-    const required = slots * 2;
-    for (const entry of depth.slice(0, required)) usedPlayerIds.add(entry.player.id);
-    roles.push({ roleId, slots, depth, required, shortage: depth.length < required });
-  }
+      .sort((a, b) => b.score - a.score || compareIds(a.player.id, b.player.id));
+    const required = dr.slots * 2;
+    return {
+      roleId: dr.roleId,
+      slots: dr.slots,
+      depth,
+      assigned: dr.assigned,
+      required,
+      shortage: dr.assigned.length < required,
+    };
+  });
 
-  const surplus = squad.filter((p) => !usedPlayerIds.has(p.id));
+  const surplus = squad.filter((p) => !assignedIds.has(p.id));
   return {
     clubId,
     roles,

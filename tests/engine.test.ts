@@ -3,6 +3,7 @@ import { createRng, deriveRng } from "../src/core/rng.js";
 import { simulateMatch } from "../src/engine/index.js";
 import { loadLeague } from "../src/model/loader.js";
 import { generateSquad } from "../src/model/playerGen.js";
+import { buildWorld } from "../src/model/world.js";
 import { selectStartingXI } from "../src/sim/lineup.js";
 import { computeCalibration } from "../src/stats/calibration.js";
 import { runSeason } from "../src/sim/season.js";
@@ -71,7 +72,8 @@ describe("match engine", () => {
 
 describe("calibration sanity (loose bounds)", () => {
   it("season-level stats are in a plausible football range", () => {
-    const report = runSeason({ leaguePath: LEAGUE_PATH, seed: 777, startYear: 2026 });
+    const world = buildWorld(777, [LEAGUE_PATH]);
+    const report = runSeason(world, { startYear: 2026 });
     const stats = computeCalibration(report.matches);
     // Wide guards, not the strict 3.4 targets: those are enforced via `npm run calibrate`.
     expect(stats.goalsPerMatch).toBeGreaterThan(1.8);

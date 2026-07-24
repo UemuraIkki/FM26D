@@ -24,6 +24,11 @@ export function generateSeasonFixtures(
   seasonStart: SimDate,
 ): Fixture[] {
   if (clubIds.length % 2 !== 0) throw new Error("club count must be even");
+  const unique = new Set(clubIds);
+  if (unique.size !== clubIds.length) throw new Error("duplicate club ids in fixture list");
+  for (const id of clubIds) {
+    if (!id) throw new Error("empty club id in fixture list");
+  }
   const rng = deriveRng(worldSeed, `fixtures:${seasonLabel}`);
   const order = [...clubIds];
   for (let i = order.length - 1; i > 0; i--) {

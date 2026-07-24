@@ -8,6 +8,7 @@ export type {
   MatchEvent,
   MatchEventType,
   MatchResult,
+  Phase,
   TeamMatchStats,
   TeamSheet,
   Zone,

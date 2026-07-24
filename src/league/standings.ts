@@ -1,3 +1,5 @@
+import { compareIds } from "../core/rng.js";
+
 export interface StandingRow {
   clubId: string;
   played: number;
@@ -64,7 +66,7 @@ export class StandingsTable {
         b.points - a.points ||
         b.goalDifference - a.goalDifference ||
         b.goalsFor - a.goalsFor ||
-        a.clubId.localeCompare(b.clubId),
+        compareIds(a.clubId, b.clubId),
     );
   }
 }

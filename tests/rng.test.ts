@@ -24,6 +24,16 @@ describe("rng", () => {
     for (let i = 0; i < 100; i++) expect(a.next()).toBe(b.next());
   });
 
+  it("supports checkpoint save/restore of internal state", () => {
+    const rng = createRng(9);
+    for (let i = 0; i < 100; i++) rng.next();
+    const snapshot = rng.getState();
+    const after = Array.from({ length: 50 }, () => rng.next());
+    rng.setState(snapshot);
+    const replayed = Array.from({ length: 50 }, () => rng.next());
+    expect(replayed).toEqual(after);
+  });
+
   it("int() covers the inclusive range uniformly-ish", () => {
     const rng = createRng(3);
     const counts = new Map<number, number>();

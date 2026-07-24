@@ -1,0 +1,21 @@
+{
+  "squadPlan": [
+    { "position": "GK", "count": 3 },
+    { "position": "DF", "count": 8 },
+    { "position": "MF", "count": 8 },
+    { "position": "FW", "count": 5 }
+  ],
+  "firstSyllables": ["Al", "Ben", "Car", "Dan", "Ed", "Fer", "Gar", "Har", "Iv", "Jor", "Kai", "Lu", "Mar", "Nic", "Os", "Pa", "Ra", "Sam", "Tom", "Vic"],
+  "lastSyllables": ["son", "ley", "ford", "ton", "well", "man", "field", "wood", "er", "is", "ez", "io", "ard", "ken", "by"],
+  "profiles": {
+    "GK": { "shotStopping": 8, "aerialHandling": 6, "distribution": 2, "passing": -12, "shooting": -25, "dribbling": -20, "defending": -8, "finishing": -20, "speed": -10 },
+    "DF": { "defending": 8, "aerial": 6, "strength": 5, "positioning": 5, "shooting": -12, "finishing": -10, "dribbling": -5 },
+    "MF": { "passing": 7, "decisions": 5, "dribbling": 3, "stamina": 4, "shooting": -2, "aerial": -4 },
+    "FW": { "shooting": 8, "finishing": 8, "dribbling": 4, "speed": 4, "defending": -12, "aerial": 0 }
+  },
+  "baseOffsetFromClubStrength": -3,
+  "playerSpreadStdDev": 5,
+  "attributeNoiseStdDev": 6,
+  "outfieldGkAttrRange": [5, 25],
+  "ageRange": [18, 34]
+}

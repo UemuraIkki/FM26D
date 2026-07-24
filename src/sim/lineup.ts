@@ -1,12 +1,16 @@
+import { compareIds } from "../core/rng.js";
 import type { EnginePlayer, TeamSheet } from "../engine/index.js";
 import { getRoleBook, isEligible, roleScore, type Formation, type RoleBook } from "../model/roles.js";
 import type { Player } from "../model/types.js";
 
 /**
- * Pick the starting XI by filling each formation slot with the highest
- * role-score eligible player not yet selected (requirement 4.2: the role
- * evaluation function drives selection). The engine only sees the resulting
- * `TeamSheet`.
+ * Pick the starting XI by role score (requirement 4.2).
+ *
+ * Slots are filled in scarcity order — the slot with the fewest remaining
+ * eligible candidates chooses first — so a flexible role can no longer consume
+ * the only player a stricter later slot could accept (which made the naive
+ * slot-order greedy reject feasible XIs). Still greedy per slot rather than a
+ * global maximum-score assignment; deterministic via compareIds tie-breaks.
  */
 
 function toEnginePlayer(p: Player): EnginePlayer {
@@ -20,20 +24,43 @@ export function selectStartingXI(
   formation: Formation = book.defaultFormation,
 ): TeamSheet {
   const picked = new Set<string>();
-  const players: EnginePlayer[] = [];
+  interface Slot {
+    index: number;
+    roleId: string;
+    player?: Player;
+  }
+  const slots: Slot[] = formation.slots.map((roleId, index) => ({ index, roleId }));
 
-  for (const slotRoleId of formation.slots) {
-    const role = book.rolesById.get(slotRoleId);
-    if (!role) throw new Error(`unknown role in formation: ${slotRoleId}`);
+  while (slots.some((s) => !s.player)) {
+    const open = slots.filter((s) => !s.player);
+    // Scarcity first: fewest eligible unpicked candidates; ties by slot index.
+    let chosen: Slot | undefined;
+    let chosenCount = Infinity;
+    for (const slot of open) {
+      const role = book.rolesById.get(slot.roleId);
+      if (!role) throw new Error(`unknown role in formation: ${slot.roleId}`);
+      const count = squad.filter((p) => !picked.has(p.id) && isEligible(p, role)).length;
+      if (count < chosenCount) {
+        chosen = slot;
+        chosenCount = count;
+      }
+    }
+    const slot = chosen!;
+    const role = book.rolesById.get(slot.roleId)!;
     const candidates = squad
       .filter((p) => !picked.has(p.id) && isEligible(p, role))
       .map((player) => ({ player, score: roleScore(player, role) }))
-      .sort((a, b) => b.score - a.score || a.player.id.localeCompare(b.player.id));
+      .sort((a, b) => b.score - a.score || compareIds(a.player.id, b.player.id));
     const best = candidates[0];
-    if (!best) throw new Error(`club ${clubId}: no eligible player for role ${slotRoleId}`);
+    if (!best) throw new Error(`club ${clubId}: no eligible player for role ${slot.roleId}`);
     picked.add(best.player.id);
-    players.push(toEnginePlayer(best.player));
+    slot.player = best.player;
   }
 
-  return { teamId: clubId, players };
+  return {
+    teamId: clubId,
+    players: slots
+      .sort((a, b) => a.index - b.index)
+      .map((s) => toEnginePlayer(s.player as Player)),
+  };
 }

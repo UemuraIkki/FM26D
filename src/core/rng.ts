@@ -13,7 +13,7 @@
 export interface Rng {
   /** Uniform float in [0, 1). */
   next(): number;
-  /** Uniform integer in [min, max] inclusive. */
+  /** Uniform integer in [min, max] inclusive (exact, via rejection sampling). */
   int(min: number, max: number): number;
   /** True with probability p. */
   chance(p: number): boolean;
@@ -23,6 +23,17 @@ export interface Rng {
   gaussian(mean?: number, stdDev?: number): number;
   /** Index into `weights` proportionally to each weight. */
   weightedIndex(weights: readonly number[]): number;
+  /** Snapshot of internal state for checkpoints (requirement 3.2). */
+  getState(): RngState;
+  /** Restore a snapshot taken with getState(). */
+  setState(state: RngState): void;
+}
+
+export interface RngState {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
 }
 
 function splitmix32(seed: number): () => number {
@@ -55,19 +66,28 @@ class Sfc32 implements Rng {
     for (let i = 0; i < 12; i++) this.next();
   }
 
-  next(): number {
+  private nextUint32(): number {
     const t = (this.a + this.b + this.d) >>> 0;
     this.d = (this.d + 1) >>> 0;
     this.a = this.b ^ (this.b >>> 9);
     this.b = (this.c + (this.c << 3)) >>> 0;
     this.c = ((this.c << 21) | (this.c >>> 11)) >>> 0;
     this.c = (this.c + t) >>> 0;
-    return t / 4294967296;
+    return t;
+  }
+
+  next(): number {
+    return this.nextUint32() / 4294967296;
   }
 
   int(min: number, max: number): number {
     if (max < min) throw new Error(`int(): max ${max} < min ${min}`);
-    return min + Math.floor(this.next() * (max - min + 1));
+    const range = max - min + 1;
+    // Rejection sampling for exact uniformity over ranges not dividing 2^32.
+    const limit = 4294967296 - (4294967296 % range);
+    let v = this.nextUint32();
+    while (v >= limit) v = this.nextUint32();
+    return min + (v % range);
   }
 
   chance(p: number): boolean {
@@ -98,10 +118,30 @@ class Sfc32 implements Rng {
     }
     return weights.length - 1;
   }
+
+  getState(): RngState {
+    return { a: this.a, b: this.b, c: this.c, d: this.d };
+  }
+
+  setState(state: RngState): void {
+    this.a = state.a >>> 0;
+    this.b = state.b >>> 0;
+    this.c = state.c >>> 0;
+    this.d = state.d >>> 0;
+  }
 }
 
 export function createRng(seed: number): Rng {
   return new Sfc32(seed);
+}
+
+/**
+ * Locale-independent string ordering for deterministic tie-breaks.
+ * `localeCompare` varies with the host ICU configuration and would break
+ * "same seed = same history" across machines.
+ */
+export function compareIds(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /** Stable 32-bit hash of a string (FNV-1a). */

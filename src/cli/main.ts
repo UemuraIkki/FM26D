@@ -1,5 +1,6 @@
 import { getRoleBook } from "../model/roles.js";
-import { buildWorld, runSeason } from "../sim/season.js";
+import { buildWorld, getSquad } from "../model/world.js";
+import { runSeason } from "../sim/season.js";
 import { buildDepthChart } from "../squad/depthChart.js";
 import { CalibrationAccumulator, computeCalibration, CALIBRATION_TARGETS } from "../stats/calibration.js";
 
@@ -27,7 +28,8 @@ function pct(x: number): string {
 function commandSeason(): void {
   const seed = argValue("seed", 20260808);
   const year = argValue("year", 2026);
-  const report = runSeason({ leaguePath: LEAGUE_PATH, seed, startYear: year });
+  const world = buildWorld(seed, [LEAGUE_PATH]);
+  const report = runSeason(world, { startYear: year });
 
   console.log(`\n=== ${report.seasonLabel} final table (seed=${seed}) ===\n`);
   console.log("Pos Club                      P   W  D  L   GF  GA  GD  Pts");
@@ -48,9 +50,8 @@ function commandCalibrate(): void {
   const acc = new CalibrationAccumulator();
   const start = Date.now();
   for (let s = 0; s < seasons; s++) {
-    runSeason({
-      leaguePath: LEAGUE_PATH,
-      seed: baseSeed + s,
+    const world = buildWorld(baseSeed + s, [LEAGUE_PATH]);
+    runSeason(world, {
       startYear: 2026,
       keepMatches: false,
       onMatch: (m) => acc.add(m),
@@ -80,13 +81,12 @@ function argString(name: string): string | undefined {
 function commandDepth(): void {
   const seed = argValue("seed", 20260808);
   const clubFilter = argString("club");
-  const world = buildWorld(seed, LEAGUE_PATH);
+  const world = buildWorld(seed, [LEAGUE_PATH]);
   const book = getRoleBook();
 
-  for (const club of world.league.clubs) {
+  for (const club of world.leagues[0]!.clubs) {
     if (clubFilter && club.id !== clubFilter) continue;
-    const squad = world.playersByClub.get(club.id)!;
-    const chart = buildDepthChart(club.id, squad, book);
+    const chart = buildDepthChart(club.id, getSquad(world, club.id), book);
 
     console.log(`\n=== ${club.name} (${club.id}, str ${club.strength}) ===`);
     if (clubFilter) {

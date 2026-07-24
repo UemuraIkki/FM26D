@@ -1,7 +1,9 @@
-import type { MatchResult, TeamSheet } from "./types.js";
+import type { MatchEvent, TeamSheet } from "./types.js";
 
 /**
- * Post-match player ratings derived purely from the event log (requirement 3.3).
+ * Post-match player ratings derived purely from the event log (requirement
+ * 3.3) — including the win/loss adjustment, whose scoreline is recomputed
+ * from GOAL events rather than read from any external result field.
  * Scale: 4.0 - 10.0, base 6.5.
  */
 
@@ -9,14 +11,23 @@ const BASE = 6.5;
 const MIN = 4.0;
 const MAX = 10.0;
 
-export function computeRatings(result: MatchResult, home: TeamSheet, away: TeamSheet): Record<string, number> {
+export function computeRatings(events: readonly MatchEvent[], home: TeamSheet, away: TeamSheet): Record<string, number> {
   const delta = new Map<string, number>();
   const bump = (id: string | undefined, amount: number): void => {
     if (!id) return;
     delta.set(id, (delta.get(id) ?? 0) + amount);
   };
 
-  for (const e of result.events) {
+  let homeGoals = 0;
+  let awayGoals = 0;
+  for (const e of events) {
+    if (e.type === "GOAL") {
+      if (e.teamId === home.teamId) homeGoals++;
+      else if (e.teamId === away.teamId) awayGoals++;
+    }
+  }
+
+  for (const e of events) {
     switch (e.type) {
       case "PASS":
       case "LONG_BALL":
@@ -53,7 +64,7 @@ export function computeRatings(result: MatchResult, home: TeamSheet, away: TeamS
   }
 
   // Team-level result adjustment: winners +0.2, losers -0.2.
-  const diff = result.homeGoals - result.awayGoals;
+  const diff = homeGoals - awayGoals;
   const teamAdj = (teamSheet: TeamSheet, sign: number): void => {
     for (const p of teamSheet.players) bump(p.id, 0.2 * sign);
   };

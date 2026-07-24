@@ -41,12 +41,25 @@ export function loadRoleBook(path = "data/roles.json"): RoleBook {
     defaultFormation: Formation;
   };
   if (!Array.isArray(raw.roles) || raw.roles.length === 0) throw new Error(`no roles in ${path}`);
+  const VALID_POSITIONS = new Set<string>(["GK", "DF", "MF", "FW"]);
   const rolesById = new Map<string, Role>();
   for (const role of raw.roles) {
     if (rolesById.has(role.id)) throw new Error(`duplicate role id: ${role.id}`);
-    for (const key of Object.keys(role.weights)) {
-      if (!ATTR_KEYS.has(key)) throw new Error(`role ${role.id}: unknown attribute "${key}"`);
+    if (!Array.isArray(role.positions) || role.positions.length === 0) {
+      throw new Error(`role ${role.id}: positions must be a non-empty array`);
     }
+    for (const pos of role.positions) {
+      if (!VALID_POSITIONS.has(pos)) throw new Error(`role ${role.id}: invalid position "${pos}"`);
+    }
+    let totalWeight = 0;
+    for (const [key, weight] of Object.entries(role.weights)) {
+      if (!ATTR_KEYS.has(key)) throw new Error(`role ${role.id}: unknown attribute "${key}"`);
+      if (typeof weight !== "number" || !Number.isFinite(weight) || weight <= 0) {
+        throw new Error(`role ${role.id}: weight for "${key}" must be a positive finite number`);
+      }
+      totalWeight += weight;
+    }
+    if (totalWeight <= 0) throw new Error(`role ${role.id}: weights must sum to > 0`);
     rolesById.set(role.id, role);
   }
   const formation = raw.defaultFormation;
