@@ -1,6 +1,6 @@
 import type { TeamSheet } from "../engine/index.js";
 import type { Formation, RoleBook } from "../model/roles.js";
-import type { Player } from "../model/types.js";
+import type { Club, Player } from "../model/types.js";
 
 /**
  * 絶対制約 (requirement 1): every club decision flows through this interface.
@@ -33,6 +33,8 @@ export interface SquadContext extends LineupContext {
   balance: number;
   /** Calendar year used for market-value computations. */
   currentYear: number;
+  /** Requirement 5.3: the deciding club, incl. its philosophy parameters. */
+  club: Club;
 }
 
 export interface MarketCandidate {

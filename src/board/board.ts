@@ -33,6 +33,22 @@ function clamp(v: number): number {
   return Math.max(0, Math.min(100, v));
 }
 
+/**
+ * Requirement 5.3: candidate hiring score. Base is pure reputation (the
+ * original "biggest available name" rule); a youth-first club additionally
+ * values development, and a perennial-winner club additionally values
+ * tactical nous. A neutral club (youthFocus = 0, developAndSell = 0) scores
+ * exactly on reputation, reproducing the pre-philosophy behavior.
+ */
+export function candidateScore(manager: Manager, club: { youthFocus?: number; developAndSell?: number }): number {
+  const youthFocus = club.youthFocus ?? 0;
+  const developAndSell = club.developAndSell ?? 0;
+  let score = manager.attributes.reputation;
+  if (youthFocus > 0) score += youthFocus * 0.5 * manager.attributes.development;
+  if (developAndSell < 0) score += -developAndSell * 0.5 * manager.attributes.tactical;
+  return score;
+}
+
 export function managerOf(world: World, clubId: string): Manager {
   const manager = world.managers.find((m) => m.clubId === clubId);
   if (!manager) throw new Error(`club has no manager: ${clubId}`);
@@ -134,11 +150,12 @@ export class BoardSystem {
     outgoing.clubId = null;
     outgoing.attributes.reputation = clamp(outgoing.attributes.reputation - 5);
 
-    // Hire the biggest available name (deterministic tie-break) — never the
-    // manager who was just shown the door.
+    // Hire the best-fitting available name by philosophy-weighted score
+    // (deterministic tie-break) — never the manager who was just shown the door.
+    const club = this.world.clubsById.get(clubId)!;
     const candidates = this.world.managers
       .filter((m) => m.clubId === null && m.id !== outgoing.id)
-      .sort((a, b) => b.attributes.reputation - a.attributes.reputation || compareIds(a.id, b.id));
+      .sort((a, b) => candidateScore(b, club) - candidateScore(a, club) || compareIds(a.id, b.id));
     const incoming = candidates[0];
     if (!incoming) {
       // Empty market: the outgoing manager stays after all.

@@ -126,6 +126,16 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
       players.push(...squad);
       playersByClub.set(club.id, squad);
       atmosphereByClub.set(club.id, 55 + deriveRng(seed, `atmosphere:${club.id}`).int(0, 10));
+      // Requirement 5.3: club philosophy. JSON can pin a value (e.g. curated
+      // "always a winner" clubs); most are auto-assigned, clustered near
+      // neutral with a minority of strong identities.
+      const philosophyRng = deriveRng(seed, `philosophy:${club.id}`);
+      if (club.youthFocus === undefined) {
+        club.youthFocus = Math.max(-1, Math.min(1, philosophyRng.gaussian(0, 0.4)));
+      }
+      if (club.developAndSell === undefined) {
+        club.developAndSell = Math.max(-1, Math.min(1, philosophyRng.gaussian(0, 0.4)));
+      }
       // Initial cash reserves scale with club stature.
       ledger.openAccount(club.id, Math.round(20 + club.strength * 1.5));
     }

@@ -1,0 +1,9 @@
+{
+  "id": "TEST1",
+  "name": "Test League",
+  "country": "Testland",
+  "clubs": [
+    { "id": "PIN", "name": "Pinned FC", "shortName": "Pinned", "strength": 75, "youthFocus": 0.9, "developAndSell": -0.9 },
+    { "id": "AUT", "name": "Auto FC", "shortName": "Auto", "strength": 75 }
+  ]
+}

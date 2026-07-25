@@ -56,6 +56,10 @@ export interface Club {
   shortName: string;
   /** Overall squad quality guide, 1-99. Used by the placeholder squad generator. */
   strength: number;
+  /** Requirement 5.3: club philosophy, -1 (win-now) .. +1 (youth-first). Omit in data to auto-assign. */
+  youthFocus?: number;
+  /** Requirement 5.3: -1 (perennial-winner) .. +1 (develop-and-sell). Omit in data to auto-assign. */
+  developAndSell?: number;
 }
 
 export interface LeagueData {

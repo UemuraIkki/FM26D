@@ -28,6 +28,19 @@ export const ASK_MULTIPLIER: Record<SquadRank, number> = {
 /** Minimum ability for a pure squad-depth signing (filling an empty backup slot). */
 const DEPTH_FLOOR = 60;
 
+/**
+ * Requirement 5.3: a club's youth-focus philosophy tilts signing priority
+ * toward (or away from) young players. Neutral (youthFocus = 0) is a 1.0
+ * no-op multiplier; a fully youth-first club (+1) roughly doubles the
+ * utility of an 18-year-old and halves that of a 32-year-old, and a fully
+ * win-now club (-1) does the reverse.
+ */
+function youthBiasMultiplier(youthFocus: number, age: number): number {
+  const youthness = (25 - age) / 10;
+  const effect = youthFocus * youthness * 0.3;
+  return Math.max(0.5, Math.min(1.5, 1 + effect));
+}
+
 /** Default autonomous club brain used for every club in observation mode. */
 export class AIDecisionMaker implements ClubDecisionMaker {
   constructor(readonly clubId: string) {}
@@ -63,9 +76,11 @@ export class AIDecisionMaker implements ClubDecisionMaker {
       if (rd.assigned.length < rd.required) missingBackups.add(rd.roleId);
     }
 
+    const youthFocus = context.club.youthFocus ?? 0;
     let best: { choice: SigningChoice; utility: number; id: string } | null = null;
     for (const { player, askingFee } of candidates) {
       if (askingFee > context.balance * MAX_FEE_FRACTION) continue;
+      const bias = youthBiasMultiplier(youthFocus, player.age);
       let utility = 0;
       for (const [roleId, starterScore] of weakestStarter) {
         const role = context.roleBook.rolesById.get(roleId)!;
@@ -73,11 +88,11 @@ export class AIDecisionMaker implements ClubDecisionMaker {
         const score = roleScore(player, role);
         const starterGain = score - starterScore;
         if (starterGain >= IMPROVEMENT_THRESHOLD) {
-          utility = Math.max(utility, starterGain / (1 + askingFee / 20));
+          utility = Math.max(utility, (starterGain / (1 + askingFee / 20)) * bias);
         }
         if (missingBackups.has(roleId) && score >= DEPTH_FLOOR + IMPROVEMENT_THRESHOLD) {
           // Depth signings matter less than XI upgrades.
-          utility = Math.max(utility, (0.5 * (score - DEPTH_FLOOR)) / (1 + askingFee / 20));
+          utility = Math.max(utility, ((0.5 * (score - DEPTH_FLOOR)) / (1 + askingFee / 20)) * bias);
         }
       }
       if (utility <= 0) continue;
@@ -107,7 +122,13 @@ export class AIDecisionMaker implements ClubDecisionMaker {
     for (const rd of chart.roles) {
       if (rd.assigned.some((e) => e.player.id === player.id)) return true;
     }
-    // Keep young prospects with real ability even if currently outside the depth.
-    return player.age <= 21 && playerAbility(player) >= 70;
+    // Keep young prospects with real ability even if currently outside the
+    // depth. Requirement 5.3: youth-first clubs (youthFocus > 0) widen the
+    // age window and lower the ability bar; win-now clubs narrow both.
+    // Neutral (youthFocus = 0) reproduces the original 21/70 thresholds.
+    const youthFocus = context.club.youthFocus ?? 0;
+    const ageLimit = 21 + Math.round(youthFocus * 3);
+    const abilityFloor = 70 - youthFocus * 10;
+    return player.age <= ageLimit && playerAbility(player) >= abilityFloor;
   }
 }

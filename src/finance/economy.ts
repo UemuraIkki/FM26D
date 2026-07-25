@@ -91,6 +91,7 @@ export function processContractExpiries(
         formation,
         balance: world.ledger.balanceOf(clubId),
         currentYear: date.year,
+        club: world.clubsById.get(clubId)!,
       };
       const keep = brain instanceof AIDecisionMaker ? brain.wantsToRenew(ctx, player) : true;
       if (keep) {

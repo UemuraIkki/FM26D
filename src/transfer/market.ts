@@ -83,6 +83,7 @@ export class TransferMarket {
       formation: this.formation,
       balance: this.world.ledger.balanceOf(clubId),
       currentYear: date.year,
+      club: this.world.clubsById.get(clubId)!,
     };
   }
 
