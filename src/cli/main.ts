@@ -7,19 +7,26 @@ import { deriveNewsFeed } from "../observe/newsFeed.js";
 import { addToWatchlist, removeFromWatchlist, watchlistStatuses } from "../observe/tracking.js";
 import { loadCheckpoint, queryNewsEvents, saveCheckpoint, type NewsEventQuery } from "../persist/checkpoint.js";
 import { evaluateHealthCheck, healthCheckToCsv, runHealthCheck, summarizeHealthCheck } from "../stats/healthCheck.js";
-import { writeFileSync } from "node:fs";
+import type { RefusalRecord } from "../transfer/market.js";
+import { appendFileSync, writeFileSync } from "node:fs";
 
 /**
  * Headless CLI (Phase A; observation commands added Phase I).
- *   npm run season      -- [--seed 12345] [--year 2026] [--leagues LIST]
+ *   npm run season      -- [--seed 12345] [--year 2026] [--leagues LIST] [--refusals-log path]
  *   npm run calibrate   -- [--seasons 50] [--seed 1] [--leagues LIST]
  *   npm run depth       -- [--seed N] [--club ID] [--leagues LIST]
- *   npm run play        -- [--seed N] --seasons N [--until YEAR] --db <path> [--resume] [--leagues LIST]
+ *   npm run play        -- [--seed N] --seasons N [--until YEAR] --db <path> [--resume] [--leagues LIST] [--refusals-log path]
  *   npm run feed        -- --db <path> [--player ID] [--type TYPE] [--limit N]
  *   npm run watch       -- --db <path> --player ID
  *   npm run unwatch     -- --db <path> --player ID
  *   npm run watchlist   -- --db <path>
  *   npm run healthcheck -- [--seed N] [--seasons 10] [--out path.csv] [--leagues LIST]
+ *
+ * Refused transfer offers (requirement 5.5-4) routinely outnumber completed
+ * moves and are log noise for a console glance, so they never print to the
+ * console — `season` overwrites `--refusals-log` (default refusals.log) each
+ * run; `play` appends a "-- season YYYY --" block per season, since it's
+ * meant for repeated/resumed invocations.
  *
  * `--leagues` selects which leagues share the world (requirement 2.2/2.3):
  * a comma-separated list of names from LEAGUE_FILES below, or the preset
@@ -73,6 +80,10 @@ function pct(x: number): string {
   return `${(x * 100).toFixed(1)}%`;
 }
 
+function formatRefusal(r: RefusalRecord): string {
+  return `${r.date}  ${r.playerName.padEnd(24)} ${(r.fromClubId ?? "FA").padEnd(4)} -> ${r.toClubId.padEnd(4)} refused: ${r.reason}`;
+}
+
 function commandSeason(): void {
   const seed = argValue("seed", 20260808);
   const year = argValue("year", 2026);
@@ -107,9 +118,11 @@ function commandSeason(): void {
     const fee = t.fee > 0 ? `£${t.fee.toFixed(1)}M` : "free";
     console.log(`${t.date}  ${t.playerName.padEnd(24)} ${(t.fromClubId ?? "FA").padEnd(4)} -> ${t.toClubId.padEnd(4)} ${fee}`);
   }
-  console.log(`\n=== Refused moves (${report.refusals.length}) ===`);
-  for (const r of report.refusals) {
-    console.log(`${r.date}  ${r.playerName.padEnd(24)} ${(r.fromClubId ?? "FA").padEnd(4)} -> ${r.toClubId.padEnd(4)} refused: ${r.reason}`);
+  // Refused moves are log noise for casual runs (routinely outnumber completed
+  // transfers) — write them to a file instead of the console.
+  const refusalsLogPath = argString("refusals-log") ?? "refusals.log";
+  if (report.refusals.length > 0) {
+    writeFileSync(refusalsLogPath, report.refusals.map(formatRefusal).join("\n") + "\n", "utf8");
   }
   console.log(`\n=== Manager changes (${report.managerChanges.length}) ===`);
   for (const c of report.managerChanges) {
@@ -208,6 +221,7 @@ function commandPlay(): void {
     console.log(`new world seed=${seed}, starting ${startYear}, leagues=[${world.leagues.map((l) => l.id).join(", ")}], saving to ${dbPath}`);
   }
 
+  const refusalsLogPath = argString("refusals-log") ?? "refusals.log";
   let seasonsRun = 0;
   while (seasonsRun < seasons && (until === undefined || startYear <= until)) {
     const prevCaps = new Map(world.capsByPlayer);
@@ -215,6 +229,10 @@ function commandPlay(): void {
     const report = runSeason(world, { startYear, keepMatches: false });
     const events = deriveNewsFeed(report, world, prevCaps, prevApps);
     saveCheckpoint(dbPath, world, startYear + 1, events);
+    if (report.refusals.length > 0) {
+      const block = `-- season ${startYear} --\n${report.refusals.map(formatRefusal).join("\n")}\n`;
+      appendFileSync(refusalsLogPath, block, "utf8");
+    }
     const champions = world.leagues
       .map((l) => `${l.id}=${report.tables.get(l.id)!.sorted()[0]?.clubId ?? "?"}`)
       .join(" ");
@@ -320,7 +338,7 @@ else if (command === "watchlist") commandWatchlist();
 else if (command === "healthcheck") commandHealthCheck();
 else {
   console.log(
-    "usage: main.ts <season|calibrate|depth|play|feed|watch|unwatch|watchlist|healthcheck> [--seed N] [--year N] [--seasons N] [--club ID] [--db PATH] [--player ID] [--until YEAR] [--resume] [--out PATH] [--leagues LIST|all]",
+    "usage: main.ts <season|calibrate|depth|play|feed|watch|unwatch|watchlist|healthcheck> [--seed N] [--year N] [--seasons N] [--club ID] [--db PATH] [--player ID] [--until YEAR] [--resume] [--out PATH] [--leagues LIST|all] [--refusals-log PATH]",
   );
   process.exit(1);
 }
