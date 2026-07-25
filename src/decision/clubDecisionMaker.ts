@@ -35,6 +35,13 @@ export interface SquadContext extends LineupContext {
   currentYear: number;
   /** Requirement 5.3: the deciding club, incl. its philosophy parameters. */
   club: Club;
+  /**
+   * Player ids this club signed earlier in the current transfer window —
+   * real clubs essentially never resell a player days after buying them.
+   * Omitted contexts (e.g. season-end contract processing) treat this as
+   * empty, since respondToOffer is the only consumer.
+   */
+  recentlyAcquired?: ReadonlySet<string>;
 }
 
 export interface MarketCandidate {

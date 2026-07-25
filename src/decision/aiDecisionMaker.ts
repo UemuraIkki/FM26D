@@ -104,6 +104,9 @@ export class AIDecisionMaker implements ClubDecisionMaker {
   }
 
   respondToOffer(context: SquadContext, player: Player, offeredFee: number): boolean {
+    // Real clubs don't flip a player days after signing them — block resale
+    // for the rest of the window they were just acquired in.
+    if (context.recentlyAcquired?.has(player.id)) return false;
     if (offeredFee < this.askingFeeFor(context, player)) return false;
     // Never sell below the minimum needed to field a starting XI. Checked
     // by position headcount, not per-role depth: two single-position roles

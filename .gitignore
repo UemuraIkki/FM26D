@@ -4,3 +4,6 @@ dist/
 out/
 *.sqlite
 .DS_Store
+
+# Local-only planning notes for future sessions; not part of the project deliverable.
+GUI_PLUGIN_BRIEF.md

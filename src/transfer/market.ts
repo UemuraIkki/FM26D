@@ -63,6 +63,8 @@ export class TransferMarket {
   private signingsThisWindow = new Map<string, number>();
   /** "buyerId:playerId" pairs already refused this window — no repeat bids. */
   private refusedPairs = new Set<string>();
+  /** Player ids bought earlier in the current window — not resold until the next one opens. */
+  private recentlyAcquired = new Set<string>();
   private windowOpen = false;
   readonly completed: TransferRecord[] = [];
   readonly refusals: RefusalRecord[] = [];
@@ -84,6 +86,7 @@ export class TransferMarket {
       balance: this.world.ledger.balanceOf(clubId),
       currentYear: date.year,
       club: this.world.clubsById.get(clubId)!,
+      recentlyAcquired: this.recentlyAcquired,
     };
   }
 
@@ -105,6 +108,7 @@ export class TransferMarket {
       // New window begins.
       this.signingsThisWindow.clear();
       this.refusedPairs.clear();
+      this.recentlyAcquired.clear();
     }
     this.windowOpen = open;
     if (!open) return;
@@ -199,6 +203,7 @@ export class TransferMarket {
       }
       pool.delete(player.id);
       transferPlayer(this.world, player.id, clubId);
+      this.recentlyAcquired.add(player.id);
       applyTransferMorale(this.world, player.id, entry.sellerId, clubId);
       player.contract = {
         annualWage: Math.round(proposal.offeredWage * 100) / 100,
