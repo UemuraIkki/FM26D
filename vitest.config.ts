@@ -12,6 +12,10 @@ export default defineConfig({
     external: ["node:sqlite", "sqlite"],
   },
   test: {
+    // Excludes worktrees Claude Code agents create under .claude/ (e.g. for
+    // isolated background tasks) — without this, a leftover worktree's own
+    // copy of tests/ gets picked up and every test runs twice.
+    exclude: ["**/node_modules/**", "**/.claude/**"],
     server: {
       deps: {
         external: [/^(node:)?sqlite$/],

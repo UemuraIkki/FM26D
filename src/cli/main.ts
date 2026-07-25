@@ -11,21 +11,54 @@ import { writeFileSync } from "node:fs";
 
 /**
  * Headless CLI (Phase A; observation commands added Phase I).
- *   npm run season      -- [--seed 12345] [--year 2026]
- *   npm run calibrate   -- [--seasons 50] [--seed 1]
- *   npm run play        -- [--seed N] --seasons N [--until YEAR] --db <path> [--resume]
+ *   npm run season      -- [--seed 12345] [--year 2026] [--leagues LIST]
+ *   npm run calibrate   -- [--seasons 50] [--seed 1] [--leagues LIST]
+ *   npm run depth       -- [--seed N] [--club ID] [--leagues LIST]
+ *   npm run play        -- [--seed N] --seasons N [--until YEAR] --db <path> [--resume] [--leagues LIST]
  *   npm run feed        -- --db <path> [--player ID] [--type TYPE] [--limit N]
  *   npm run watch       -- --db <path> --player ID
  *   npm run unwatch     -- --db <path> --player ID
  *   npm run watchlist   -- --db <path>
- *   npm run healthcheck -- [--seed N] [--seasons 10] [--out path.csv]
+ *   npm run healthcheck -- [--seed N] [--seasons 10] [--out path.csv] [--leagues LIST]
+ *
+ * `--leagues` selects which leagues share the world (requirement 2.2/2.3):
+ * a comma-separated list of names from LEAGUE_FILES below, or the preset
+ * "all" for all five. Defaults to premier-league alone when omitted, for
+ * backward-compatible single-league runs. The Champions League and
+ * international windows/World Cup/EURO auto-activate once 2+ leagues are
+ * simulated (src/sim/season.ts) — no separate flag needed. `--resume` reads
+ * the league set back out of the checkpoint, so `--leagues` only matters
+ * when starting a *new* world.
  *
  * `play`'s checkpoints are season-granularity, not day-granularity (see the
  * Phase I plan / README) — "指定日到達での自動一時停止" (--until) stops
  * once a season boundary reaches the target year, not an arbitrary day.
  */
 
-const LEAGUE_PATH = "data/leagues/premier-league.json";
+const LEAGUE_FILES: Record<string, string> = {
+  "premier-league": "data/leagues/premier-league.json",
+  "la-liga": "data/leagues/la-liga.json",
+  bundesliga: "data/leagues/bundesliga.json",
+  "serie-a": "data/leagues/serie-a.json",
+  "ligue-1": "data/leagues/ligue-1.json",
+};
+const BIG_FIVE = Object.values(LEAGUE_FILES);
+
+function resolveLeaguePaths(): string[] {
+  const raw = argString("leagues");
+  if (!raw) return [LEAGUE_FILES["premier-league"]!];
+  if (raw === "all" || raw === "big5") return BIG_FIVE;
+  const paths: string[] = [];
+  for (const name of raw.split(",").map((s) => s.trim())) {
+    const path = LEAGUE_FILES[name];
+    if (!path) {
+      console.log(`unknown league "${name}" (available: ${Object.keys(LEAGUE_FILES).join(", ")}, or "all")`);
+      process.exit(1);
+    }
+    paths.push(path);
+  }
+  return paths;
+}
 
 function argValue(name: string, fallback: number): number {
   const idx = process.argv.indexOf(`--${name}`);
@@ -43,16 +76,27 @@ function pct(x: number): string {
 function commandSeason(): void {
   const seed = argValue("seed", 20260808);
   const year = argValue("year", 2026);
-  const world = buildWorld(seed, [LEAGUE_PATH]);
+  const leaguePaths = resolveLeaguePaths();
+  const world = buildWorld(seed, leaguePaths);
   const report = runSeason(world, { startYear: year });
 
-  console.log(`\n=== ${report.seasonLabel} final table (seed=${seed}) ===\n`);
-  console.log("Pos Club                      P   W  D  L   GF  GA  GD  Pts");
-  report.table.sorted().forEach((row, i) => {
-    console.log(
-      `${String(i + 1).padStart(2)}  ${row.clubId.padEnd(24)} ${String(row.played).padStart(3)} ${String(row.won).padStart(3)} ${String(row.drawn).padStart(2)} ${String(row.lost).padStart(2)} ${String(row.goalsFor).padStart(4)} ${String(row.goalsAgainst).padStart(3)} ${String(row.goalDifference).padStart(4)} ${String(row.points).padStart(4)}`,
-    );
-  });
+  for (const league of world.leagues) {
+    const table = report.tables.get(league.id)!;
+    console.log(`\n=== ${report.seasonLabel} — ${league.name} final table (seed=${seed}) ===\n`);
+    console.log("Pos Club                      P   W  D  L   GF  GA  GD  Pts");
+    table.sorted().forEach((row, i) => {
+      console.log(
+        `${String(i + 1).padStart(2)}  ${row.clubId.padEnd(24)} ${String(row.played).padStart(3)} ${String(row.won).padStart(3)} ${String(row.drawn).padStart(2)} ${String(row.lost).padStart(2)} ${String(row.goalsFor).padStart(4)} ${String(row.goalsAgainst).padStart(3)} ${String(row.goalDifference).padStart(4)} ${String(row.points).padStart(4)}`,
+      );
+    });
+  }
+
+  if (report.championsLeague) {
+    console.log(`\n=== Champions League ===`);
+    console.log(`winner: ${report.championsLeague.winnerId ?? "(unfinished)"}`);
+  }
+  if (report.worldCup) console.log(`\n=== World Cup ===\nwinner: ${report.worldCup.winnerId ?? "(unfinished)"}`);
+  if (report.euro) console.log(`\n=== EURO ===\nwinner: ${report.euro.winnerId ?? "(unfinished)"}`);
 
   const stats = computeCalibration(report.matches);
   console.log(`\nGoals/match: ${stats.goalsPerMatch.toFixed(2)}  Pass%: ${pct(stats.passSuccessRate)}  Shots/team: ${stats.shotsPerTeamPerMatch.toFixed(1)}`);
@@ -79,10 +123,11 @@ function commandSeason(): void {
 function commandCalibrate(): void {
   const seasons = argValue("seasons", 50);
   const baseSeed = argValue("seed", 1);
+  const leaguePaths = resolveLeaguePaths();
   const acc = new CalibrationAccumulator();
   const start = Date.now();
   for (let s = 0; s < seasons; s++) {
-    const world = buildWorld(baseSeed + s, [LEAGUE_PATH]);
+    const world = buildWorld(baseSeed + s, leaguePaths);
     runSeason(world, {
       startYear: 2026,
       keepMatches: false,
@@ -113,10 +158,11 @@ function argString(name: string): string | undefined {
 function commandDepth(): void {
   const seed = argValue("seed", 20260808);
   const clubFilter = argString("club");
-  const world = buildWorld(seed, [LEAGUE_PATH]);
+  const world = buildWorld(seed, resolveLeaguePaths());
   const book = getRoleBook();
 
-  for (const club of world.leagues[0]!.clubs) {
+  const clubs = world.leagues.flatMap((l) => l.clubs);
+  for (const club of clubs) {
     if (clubFilter && club.id !== clubFilter) continue;
     const chart = buildDepthChart(club.id, getSquad(world, club.id), book);
 
@@ -157,9 +203,9 @@ function commandPlay(): void {
     startYear = loaded.nextStartYear;
     console.log(`resumed from ${dbPath}: next season ${startYear}`);
   } else {
-    world = buildWorld(seed, [LEAGUE_PATH]);
+    world = buildWorld(seed, resolveLeaguePaths());
     startYear = 2026;
-    console.log(`new world seed=${seed}, starting ${startYear}, saving to ${dbPath}`);
+    console.log(`new world seed=${seed}, starting ${startYear}, leagues=[${world.leagues.map((l) => l.id).join(", ")}], saving to ${dbPath}`);
   }
 
   let seasonsRun = 0;
@@ -169,7 +215,13 @@ function commandPlay(): void {
     const report = runSeason(world, { startYear, keepMatches: false });
     const events = deriveNewsFeed(report, world, prevCaps, prevApps);
     saveCheckpoint(dbPath, world, startYear + 1, events);
-    console.log(`season ${startYear}: champion=${report.table.sorted()[0]?.clubId ?? "?"}  events=${events.length}  checkpoint saved`);
+    const champions = world.leagues
+      .map((l) => `${l.id}=${report.tables.get(l.id)!.sorted()[0]?.clubId ?? "?"}`)
+      .join(" ");
+    const clLine = report.championsLeague ? ` CL=${report.championsLeague.winnerId ?? "?"}` : "";
+    const wcLine = report.worldCup ? ` WC=${report.worldCup.winnerId ?? "?"}` : "";
+    const euroLine = report.euro ? ` EURO=${report.euro.winnerId ?? "?"}` : "";
+    console.log(`season ${startYear}: ${champions}${clLine}${wcLine}${euroLine}  events=${events.length}  checkpoint saved`);
     startYear += 1;
     seasonsRun += 1;
   }
@@ -242,7 +294,7 @@ function commandHealthCheck(): void {
   const seed = argValue("seed", 20260808);
   const seasons = argValue("seasons", 10);
   const outPath = argString("out") ?? "healthcheck.csv";
-  const world = buildWorld(seed, [LEAGUE_PATH]);
+  const world = buildWorld(seed, resolveLeaguePaths());
 
   console.log(`\n=== Long-term health check: ${seasons} seasons (seed=${seed}) ===\n`);
   const rows = runHealthCheck(world, 2026, seasons);
@@ -268,7 +320,7 @@ else if (command === "watchlist") commandWatchlist();
 else if (command === "healthcheck") commandHealthCheck();
 else {
   console.log(
-    "usage: main.ts <season|calibrate|depth|play|feed|watch|unwatch|watchlist|healthcheck> [--seed N] [--year N] [--seasons N] [--club ID] [--db PATH] [--player ID] [--until YEAR] [--resume] [--out PATH]",
+    "usage: main.ts <season|calibrate|depth|play|feed|watch|unwatch|watchlist|healthcheck> [--seed N] [--year N] [--seasons N] [--club ID] [--db PATH] [--player ID] [--until YEAR] [--resume] [--out PATH] [--leagues LIST|all]",
   );
   process.exit(1);
 }

@@ -2,6 +2,7 @@
 
 Football Manager 風のサッカー世界を「放置して観測する」ためのヘッドレスシミュレーター。
 要件定義は [football-sim-requirements-v1.md](football-sim-requirements-v1.md) を参照。
+実際の操作方法(コマンド一覧・遊び方)は [MANUAL.md](MANUAL.md) を参照。
 
 ## 現在の状態: 要件定義書の機能要件を全て実装完了(フェーズA〜I、実データ5大リーグ全て、クラブ哲学含む)
 
@@ -40,18 +41,21 @@ Football Manager 風のサッカー世界を「放置して観測する」ため
 
 ## 使い方
 
+詳しい遊び方・全コマンドのオプションは [MANUAL.md](MANUAL.md) を参照。クイックスタート:
+
 ```bash
 npm install
 npm test                # 全テスト(決定論・日程・順位表・エンジン・大会・観測UI 等)
-npm run season          # 1シーズン実行して順位表を表示
+npm run season          # 1シーズン実行して順位表を表示(既定はプレミアリーグ単体)
 npm run season -- --seed 42
+npm run season -- --leagues all     # 5大リーグ+チャンピオンズリーグ+代表戦/W杯/EUROを1シーズン実行
 npm run calibrate -- --seasons 50   # キャリブレーション指標を検証
 npm run depth                       # 全クラブの不足/余剰一覧
 npm run depth -- --club ARS         # 1クラブのデプスチャート詳細
 npm run healthcheck                 # 長期健全性テスト(10シーズン)をCSV出力+閾値監視
 
 # 観測UI(フェーズI): 複数シーズンをSQLiteにチェックポイントしながら連続実行
-npm run play -- --seed 1 --seasons 5 --db world.sqlite
+npm run play -- --seed 1 --seasons 5 --db world.sqlite --leagues all
 npm run play -- --seasons 3 --db world.sqlite --resume   # 続きから再開
 npm run feed -- --db world.sqlite --type TITLE            # ニュースフィード検索
 npm run watch -- --db world.sqlite --player LIV-01         # 選手をウォッチ登録
@@ -59,7 +63,9 @@ npm run watchlist -- --db world.sqlite                      # ウォッチ中選
 npm run unwatch -- --db world.sqlite --player LIV-01
 ```
 
-`play`のチェックポイントは**シーズン単位**の粒度(季中の日単位一時停止・再開はスコープ外 — 季をまたぐ一時オブジェクトを持たない`World`単体で決定論を完全保持できる粒度として採用)。
+`--leagues LIST|all`(既定 `premier-league` 単体、`all`で5大リーグ)は `season`/`calibrate`/`depth`/`play`/`healthcheck` 共通のオプション。2リーグ以上を選ぶとチャンピオンズリーグと代表戦(国際ウィンドウ+4年周期のW杯/EURO)が自動的に有効になる(リーグ数のみで自動判定、個別フラグなし)。これらのシステム自体はフェーズG/Hで実装済みだったが、CLIからは`data/leagues/premier-league.json`固定で単一リーグしか起動できず、テストコード経由でしか到達できなかった導線を今回のCLI改修で解消した。
+
+`play`のチェックポイントは**シーズン単位**の粒度(季中の日単位一時停止・再開はスコープ外 — 季をまたぐ一時オブジェクトを持たない`World`単体で決定論を完全保持できる粒度として採用)。`--resume`時は`--leagues`の指定は無視され、セーブ済みのリーグ構成がそのまま使われる。
 
 ## 構成
 
