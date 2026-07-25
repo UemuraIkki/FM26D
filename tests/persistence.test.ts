@@ -60,6 +60,23 @@ describe("World serialize/deserialize (requirement 6.2 checkpoint)", () => {
       }
     }
   });
+
+  it("round-trips Manager Mode state (humanControlledClubId/managerPolicy)", () => {
+    const world = buildWorld(42, [LEAGUE_PATH]);
+    world.humanControlledClubId = "ARS";
+    world.managerPolicy = { protectedPlayers: ["ARS-01"], releaseList: ["ARS-02"] };
+
+    const restored = deserializeWorld(serializeWorld(world));
+    expect(restored.humanControlledClubId).toBe("ARS");
+    expect(restored.managerPolicy).toEqual(world.managerPolicy);
+  });
+
+  it("omits Manager Mode fields entirely for a pure observation-mode world (no stray keys/undefined leaking through)", () => {
+    const world = buildWorld(42, [LEAGUE_PATH]);
+    const restored = deserializeWorld(serializeWorld(world));
+    expect(restored.humanControlledClubId).toBeUndefined();
+    expect(restored.managerPolicy).toBeUndefined();
+  });
 });
 
 describe("Phase I completion: checkpoint save/resume is determinism-preserving (requirement 3.2/6.2)", () => {

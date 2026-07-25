@@ -1,5 +1,4 @@
 import type { SimDate } from "../core/calendar.js";
-import { AIDecisionMaker } from "../decision/aiDecisionMaker.js";
 import type { ClubDecisionMaker, SquadContext } from "../decision/clubDecisionMaker.js";
 import type { StandingRow } from "../league/standings.js";
 import type { Formation, RoleBook } from "../model/roles.js";
@@ -93,7 +92,7 @@ export function processContractExpiries(
         currentYear: date.year,
         club: world.clubsById.get(clubId)!,
       };
-      const keep = brain instanceof AIDecisionMaker ? brain.wantsToRenew(ctx, player) : true;
+      const keep = brain?.wantsToRenew(ctx, player) ?? true;
       if (keep) {
         player.contract = {
           annualWage: wageFor(playerAbility(player)),

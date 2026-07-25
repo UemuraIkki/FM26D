@@ -1,4 +1,5 @@
 import { deriveRng } from "../core/rng.js";
+import type { ManagerPolicy } from "../decision/humanDecisionMaker.js";
 import type { TeamSheet } from "../engine/index.js";
 import { Ledger } from "../finance/ledger.js";
 import { growthPotential, playerAbility, wageFor } from "../finance/value.js";
@@ -79,6 +80,10 @@ export interface World {
   retiredArchive: Map<string, RetiredRecord>;
   /** Calendar year world creation; used to seed contract end-years. */
   foundedYear: number;
+  /** Manager Mode (future extension): which club (if any) a human controls. Unset = pure observation mode. */
+  humanControlledClubId?: string;
+  /** Manager Mode: the human's current standing policy for humanControlledClubId. */
+  managerPolicy?: ManagerPolicy;
 }
 
 export function buildWorld(seed: number, leaguePaths: readonly string[], foundedYear = 2026): World {

@@ -12,7 +12,7 @@ import type { Player } from "../model/types.js";
  * global maximum-score assignment; deterministic via compareIds tie-breaks.
  */
 
-function toEnginePlayer(p: Player): EnginePlayer {
+export function toEnginePlayer(p: Player): EnginePlayer {
   return { id: p.id, position: p.position, ...p.attributes };
 }
 

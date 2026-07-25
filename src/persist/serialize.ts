@@ -1,3 +1,4 @@
+import type { ManagerPolicy } from "../decision/humanDecisionMaker.js";
 import { Ledger, type Transaction } from "../finance/ledger.js";
 import type { PlayerMorale } from "../morale/morale.js";
 import type { PlayerFitness } from "../model/fitness.js";
@@ -30,6 +31,8 @@ interface SerializedWorld {
   watchlist: string[];
   retiredArchive: Array<[string, RetiredRecord]>;
   foundedYear: number;
+  humanControlledClubId: string | null;
+  managerPolicy: ManagerPolicy | null;
 }
 
 export function serializeWorld(world: World): string {
@@ -49,6 +52,8 @@ export function serializeWorld(world: World): string {
     watchlist: [...world.watchlist],
     retiredArchive: [...world.retiredArchive],
     foundedYear: world.foundedYear,
+    humanControlledClubId: world.humanControlledClubId ?? null,
+    managerPolicy: world.managerPolicy ?? null,
   };
   return JSON.stringify(data);
 }
@@ -87,5 +92,7 @@ export function deserializeWorld(json: string): World {
     foundedYear: data.foundedYear,
   };
   if (data.lastSeasonPositions) world.lastSeasonPositions = new Map(data.lastSeasonPositions);
+  if (data.humanControlledClubId) world.humanControlledClubId = data.humanControlledClubId;
+  if (data.managerPolicy) world.managerPolicy = data.managerPolicy;
   return world;
 }

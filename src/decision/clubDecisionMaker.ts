@@ -20,6 +20,8 @@ export interface ClubDecisionMaker {
   chooseSigning(context: SquadContext, candidates: readonly MarketCandidate[]): SigningChoice | null;
   /** Seller side: accept or reject a concrete fee offer (requirement 5.5 step 3). */
   respondToOffer(context: SquadContext, player: Player, offeredFee: number): boolean;
+  /** Renewal policy at contract expiry (requirement 4.6). */
+  wantsToRenew(context: SquadContext, player: Player): boolean;
 }
 
 export interface LineupContext {
