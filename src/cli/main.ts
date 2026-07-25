@@ -6,16 +6,19 @@ import { CalibrationAccumulator, computeCalibration, CALIBRATION_TARGETS } from 
 import { deriveNewsFeed } from "../observe/newsFeed.js";
 import { addToWatchlist, removeFromWatchlist, watchlistStatuses } from "../observe/tracking.js";
 import { loadCheckpoint, queryNewsEvents, saveCheckpoint, type NewsEventQuery } from "../persist/checkpoint.js";
+import { evaluateHealthCheck, healthCheckToCsv, runHealthCheck, summarizeHealthCheck } from "../stats/healthCheck.js";
+import { writeFileSync } from "node:fs";
 
 /**
  * Headless CLI (Phase A; observation commands added Phase I).
- *   npm run season    -- [--seed 12345] [--year 2026]
- *   npm run calibrate -- [--seasons 50] [--seed 1]
- *   npm run play      -- [--seed N] --seasons N [--until YEAR] --db <path> [--resume]
- *   npm run feed      -- --db <path> [--player ID] [--type TYPE] [--limit N]
- *   npm run watch     -- --db <path> --player ID
- *   npm run unwatch   -- --db <path> --player ID
- *   npm run watchlist -- --db <path>
+ *   npm run season      -- [--seed 12345] [--year 2026]
+ *   npm run calibrate   -- [--seasons 50] [--seed 1]
+ *   npm run play        -- [--seed N] --seasons N [--until YEAR] --db <path> [--resume]
+ *   npm run feed        -- --db <path> [--player ID] [--type TYPE] [--limit N]
+ *   npm run watch       -- --db <path> --player ID
+ *   npm run unwatch     -- --db <path> --player ID
+ *   npm run watchlist   -- --db <path>
+ *   npm run healthcheck -- [--seed N] [--seasons 10] [--out path.csv]
  *
  * `play`'s checkpoints are season-granularity, not day-granularity (see the
  * Phase I plan / README) — "指定日到達での自動一時停止" (--until) stops
@@ -228,6 +231,31 @@ function commandWatchlist(): void {
   }
 }
 
+/**
+ * Long-term health check (non-functional requirement 7, 必須): run N
+ * seasons on one persistent world, track league average age/ability,
+ * money conservation, champion concentration (Gini) and the
+ * retirement-vs-academy-intake balance, write a CSV, and print
+ * threshold pass/fail for each metric.
+ */
+function commandHealthCheck(): void {
+  const seed = argValue("seed", 20260808);
+  const seasons = argValue("seasons", 10);
+  const outPath = argString("out") ?? "healthcheck.csv";
+  const world = buildWorld(seed, [LEAGUE_PATH]);
+
+  console.log(`\n=== Long-term health check: ${seasons} seasons (seed=${seed}) ===\n`);
+  const rows = runHealthCheck(world, 2026, seasons);
+  const summary = summarizeHealthCheck(world, rows);
+
+  writeFileSync(outPath, healthCheckToCsv(rows), "utf8");
+  console.log(`CSV written to ${outPath}\n`);
+
+  for (const { metric, ok, detail } of evaluateHealthCheck(summary)) {
+    console.log(`${ok ? "OK " : "NG "} ${metric.padEnd(28)} ${detail}`);
+  }
+}
+
 const command = process.argv[2];
 if (command === "season") commandSeason();
 else if (command === "calibrate") commandCalibrate();
@@ -237,9 +265,10 @@ else if (command === "feed") commandFeed();
 else if (command === "watch") commandWatchToggle(true);
 else if (command === "unwatch") commandWatchToggle(false);
 else if (command === "watchlist") commandWatchlist();
+else if (command === "healthcheck") commandHealthCheck();
 else {
   console.log(
-    "usage: main.ts <season|calibrate|depth|play|feed|watch|unwatch|watchlist> [--seed N] [--year N] [--seasons N] [--club ID] [--db PATH] [--player ID] [--until YEAR] [--resume]",
+    "usage: main.ts <season|calibrate|depth|play|feed|watch|unwatch|watchlist|healthcheck> [--seed N] [--year N] [--seasons N] [--club ID] [--db PATH] [--player ID] [--until YEAR] [--resume] [--out PATH]",
   );
   process.exit(1);
 }

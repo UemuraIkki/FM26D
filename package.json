@@ -18,7 +18,8 @@
     "feed": "tsx src/cli/main.ts feed",
     "watch": "tsx src/cli/main.ts watch",
     "unwatch": "tsx src/cli/main.ts unwatch",
-    "watchlist": "tsx src/cli/main.ts watchlist"
+    "watchlist": "tsx src/cli/main.ts watchlist",
+    "healthcheck": "tsx src/cli/main.ts healthcheck"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
