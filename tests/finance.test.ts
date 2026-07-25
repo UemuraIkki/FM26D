@@ -50,7 +50,10 @@ describe("market value (requirement 4.2)", () => {
       .sort((x, y) => y.a - x.a)[0]!;
     const value = marketValue(star.p, 2026);
     expect(value).toBeGreaterThan(5);
-    expect(value).toBeLessThan(300);
+    // Loose sanity ceiling, not a calibration target: real ages (requirement
+    // 8) widen the variance a bit vs. purely procedural ages, so this just
+    // guards against a genuinely broken value, not a specific number.
+    expect(value).toBeLessThan(400);
     expect(wageFor(star.a)).toBeGreaterThan(1);
   });
 });

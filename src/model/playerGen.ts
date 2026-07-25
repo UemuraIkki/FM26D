@@ -2,15 +2,21 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Rng } from "../core/rng.js";
 import { deriveRng } from "../core/rng.js";
+import { mapCountryNameToCode } from "./nationality.js";
+import type { RosterPlayer } from "./roster.js";
 import type { Club, Player, PlayerAttributes, Position } from "./types.js";
 
 /**
- * Placeholder procedural squad generation for Phase A/B.
+ * Procedural squad generation (Phase A/B), now real-name-aware (requirement
+ * 8): attribute generation stays fully synthetic — no legitimate public
+ * source of FM-style 17-attribute ratings exists to import — but a club's
+ * name/position/age/nationality are drawn from a real roster
+ * (src/model/roster.ts) when one is supplied, falling back to procedural
+ * identity generation position-by-position for any shortfall.
  *
  * Generation parameters (squad plan, name syllables, positional profiles,
  * spreads) are data-driven from data/playergen.json per the 非機能/データ
- * requirement. Real-data import (requirement 8) later replaces this module as
- * the squad source; the rest of the sim only depends on the `Player` shape.
+ * requirement.
  */
 
 export interface PlayerGenConfig {
@@ -73,26 +79,39 @@ function generateAttributes(rng: Rng, config: PlayerGenConfig, base: number, pos
   return attrs;
 }
 
-export function generateSquad(worldSeed: number, club: Club): Player[] {
+export function generateSquad(worldSeed: number, club: Club, roster?: readonly RosterPlayer[]): Player[] {
   const config = getConfig();
   const rng = deriveRng(worldSeed, `squad:${club.id}`);
   const players: Player[] = [];
   let serial = 0;
+
+  // Real players available per position, consumed as each slot is filled.
+  const realByPosition = new Map<Position, RosterPlayer[]>();
+  if (roster) {
+    for (const p of roster) {
+      const list = realByPosition.get(p.position) ?? [];
+      list.push(p);
+      realByPosition.set(p.position, list);
+    }
+  }
+
   for (const { position, count } of config.squadPlan) {
+    const realPool = realByPosition.get(position);
     for (let i = 0; i < count; i++) {
       serial++;
       // Base level: club strength with per-player spread; a few points below
       // strength on average so `strength` reads as "first XI quality".
       const base = club.strength + config.baseOffsetFromClubStrength + rng.gaussian(0, config.playerSpreadStdDev);
+      const real = realPool?.shift();
       players.push({
         id: `${club.id}-${String(serial).padStart(2, "0")}`,
-        name: makeName(rng, config),
+        name: real?.name ?? makeName(rng, config),
         clubId: club.id,
         position,
-        age: rng.int(config.ageRange[0], config.ageRange[1]),
+        age: real?.age ?? rng.int(config.ageRange[0], config.ageRange[1]),
         attributes: generateAttributes(rng, config, base, position),
         contract: null, // assigned by buildWorld
-        nationality: "", // assigned by buildWorld
+        nationality: real ? mapCountryNameToCode(real.nationality) : "", // "" assigned by buildWorld
         potential: 0, // assigned by buildWorld
       });
     }

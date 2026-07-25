@@ -39,3 +39,26 @@ export function pickNationality(rng: Rng): string {
   const idx = rng.weightedIndex(nations.map((n) => n.weight));
   return nations[idx]!.id;
 }
+
+const NAME_ALIASES: Record<string, string> = {
+  usa: "united states",
+  "united states of america": "united states",
+  "republic of korea": "south korea",
+  "ivory coast": "côte d'ivoire",
+};
+
+/**
+ * Map a plain country name (e.g. from real roster data, requirement 8) to
+ * this project's nation id where recognized (data/nationalities.json).
+ * Countries outside that list (most of the world — it only names the big
+ * five leagues' host countries plus a curated set of footballing nations)
+ * are returned unchanged: those players simply aren't eligible for the
+ * simulated national-team call-ups (src/model/nationalTeam.ts), the same
+ * as any shadow-world nationality.
+ */
+export function mapCountryNameToCode(countryName: string): string {
+  const { nations } = loadNationalities();
+  const key = NAME_ALIASES[countryName.toLowerCase()] ?? countryName.toLowerCase();
+  const match = nations.find((n) => n.name.toLowerCase() === key);
+  return match?.id ?? countryName;
+}

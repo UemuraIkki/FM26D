@@ -8,6 +8,7 @@ import { generateManagers, type Manager } from "./manager.js";
 import { loadLeague } from "./loader.js";
 import { pickNationality } from "./nationality.js";
 import { generateSquad } from "./playerGen.js";
+import { loadRoster } from "./roster.js";
 import type { Club, LeagueData, Player, Position } from "./types.js";
 
 /**
@@ -95,10 +96,11 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
   for (const path of leaguePaths) {
     const league = loadLeague(path);
     leagues.push(league);
+    const roster = loadRoster(path);
     for (const club of league.clubs) {
       if (clubsById.has(club.id)) throw new Error(`duplicate club id across leagues: ${club.id}`);
       clubsById.set(club.id, club);
-      const squad = generateSquad(seed, club);
+      const squad = generateSquad(seed, club, roster?.[club.id]);
       const contractRng = deriveRng(seed, `contracts:${club.id}`);
       const moraleRng = deriveRng(seed, `morale:${club.id}`);
       const nationalityRng = deriveRng(seed, `nationality:${club.id}`);
@@ -109,7 +111,7 @@ export function buildWorld(seed: number, leaguePaths: readonly string[], founded
           annualWage: wageFor(ability),
           endYear: foundedYear + contractRng.int(1, 4),
         };
-        player.nationality = pickNationality(nationalityRng);
+        if (!player.nationality) player.nationality = pickNationality(nationalityRng);
         player.potential = growthPotential(ability, player.age, potentialRng);
         moraleByPlayer.set(player.id, {
           morale: 55 + moraleRng.int(0, 15),
