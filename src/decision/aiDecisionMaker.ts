@@ -16,7 +16,7 @@ import type { TeamSheet } from "../engine/index.js";
 /** Minimum role-score improvement over the current starter to justify a signing. */
 const IMPROVEMENT_THRESHOLD = 2;
 /** Never spend more than this fraction of the balance on one fee. */
-const MAX_FEE_FRACTION = 0.5;
+export const MAX_FEE_FRACTION = 0.5;
 
 /** Ask multipliers by squad status (requirement 5.5 step 3: self-valuation × depth coef). */
 export const ASK_MULTIPLIER: Record<SquadRank, number> = {

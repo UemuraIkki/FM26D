@@ -16,24 +16,30 @@ export function toEnginePlayer(p: Player): EnginePlayer {
   return { id: p.id, position: p.position, ...p.attributes };
 }
 
-export function selectStartingXI(
-  clubId: string,
-  squad: readonly Player[],
-  book: RoleBook = getRoleBook(),
-  formation: Formation = book.defaultFormation,
-): TeamSheet {
-  const picked = new Set<string>();
-  interface Slot {
-    index: number;
-    roleId: string;
-    player?: Player;
-  }
-  const slots: Slot[] = formation.slots.map((roleId, index) => ({ index, roleId }));
+export interface LineupSlot {
+  index: number;
+  roleId: string;
+  player?: Player;
+}
 
+/**
+ * Fills every still-open slot in scarcity order (fewest eligible unpicked
+ * candidates first, so a flexible role can't consume the only player a
+ * stricter later slot could accept) via role-score selection, mutating
+ * `slots`/`picked` in place. Shared by `selectStartingXI` (all-automatic)
+ * and `HumanDecisionMaker.selectLineup` (fills whatever a manager policy's
+ * explicit picks didn't cover) so both apply identical fallback logic.
+ */
+export function fillOpenSlots(
+  slots: LineupSlot[],
+  squad: readonly Player[],
+  book: RoleBook,
+  picked: Set<string>,
+  clubId: string,
+): void {
   while (slots.some((s) => !s.player)) {
     const open = slots.filter((s) => !s.player);
-    // Scarcity first: fewest eligible unpicked candidates; ties by slot index.
-    let chosen: Slot | undefined;
+    let chosen: LineupSlot | undefined;
     let chosenCount = Infinity;
     for (const slot of open) {
       const role = book.rolesById.get(slot.roleId);
@@ -51,11 +57,23 @@ export function selectStartingXI(
     picked.add(best.player.id);
     slot.player = best.player;
   }
+}
 
+export function buildTeamSheet(clubId: string, slots: readonly LineupSlot[]): TeamSheet {
   return {
     teamId: clubId,
-    players: slots
-      .sort((a, b) => a.index - b.index)
-      .map((s) => toEnginePlayer(s.player as Player)),
+    players: [...slots].sort((a, b) => a.index - b.index).map((s) => toEnginePlayer(s.player as Player)),
   };
+}
+
+export function selectStartingXI(
+  clubId: string,
+  squad: readonly Player[],
+  book: RoleBook = getRoleBook(),
+  formation: Formation = book.defaultFormation,
+): TeamSheet {
+  const picked = new Set<string>();
+  const slots: LineupSlot[] = formation.slots.map((roleId, index) => ({ index, roleId }));
+  fillOpenSlots(slots, squad, book, picked, clubId);
+  return buildTeamSheet(clubId, slots);
 }

@@ -1,8 +1,7 @@
-import { countEligible, rankEligible } from "../model/roles.js";
 import type { Player } from "../model/types.js";
 import type { TeamSheet } from "../engine/index.js";
-import { toEnginePlayer } from "../sim/lineup.js";
-import { AIDecisionMaker } from "./aiDecisionMaker.js";
+import { buildTeamSheet, fillOpenSlots, type LineupSlot } from "../sim/lineup.js";
+import { AIDecisionMaker, MAX_FEE_FRACTION } from "./aiDecisionMaker.js";
 import type {
   ClubDecisionMaker,
   LineupContext,
@@ -45,12 +44,7 @@ export class HumanDecisionMaker implements ClubDecisionMaker {
     if (!preferred) return this.ai.selectLineup(context);
 
     const picked = new Set<string>();
-    interface Slot {
-      index: number;
-      roleId: string;
-      player?: Player;
-    }
-    const slots: Slot[] = context.formation.slots.map((roleId, index) => ({ index, roleId }));
+    const slots: LineupSlot[] = context.formation.slots.map((roleId, index) => ({ index, roleId }));
 
     // Pass 1: honor explicit picks where the player is actually available and eligible.
     for (const slot of slots) {
@@ -66,31 +60,9 @@ export class HumanDecisionMaker implements ClubDecisionMaker {
 
     // Pass 2: fill everything else with the same scarcity-order role-score
     // selection AIDecisionMaker/selectStartingXI use, scoped to what's left.
-    while (slots.some((s) => !s.player)) {
-      const open = slots.filter((s) => !s.player);
-      let chosen: Slot | undefined;
-      let chosenCount = Infinity;
-      for (const slot of open) {
-        const role = context.roleBook.rolesById.get(slot.roleId);
-        if (!role) throw new Error(`unknown role in formation: ${slot.roleId}`);
-        const count = countEligible(context.squad, role, picked);
-        if (count < chosenCount) {
-          chosen = slot;
-          chosenCount = count;
-        }
-      }
-      const slot = chosen!;
-      const role = context.roleBook.rolesById.get(slot.roleId)!;
-      const best = rankEligible(context.squad, role, picked)[0];
-      if (!best) throw new Error(`club ${this.clubId}: no eligible player for role ${slot.roleId}`);
-      picked.add(best.player.id);
-      slot.player = best.player;
-    }
+    fillOpenSlots(slots, context.squad, context.roleBook, picked, this.clubId);
 
-    return {
-      teamId: this.clubId,
-      players: slots.sort((a, b) => a.index - b.index).map((s) => toEnginePlayer(s.player as Player)),
-    };
+    return buildTeamSheet(this.clubId, slots);
   }
 
   nominateSaleListings(context: SquadContext): Player[] {
@@ -103,7 +75,7 @@ export class HumanDecisionMaker implements ClubDecisionMaker {
     for (const playerId of targets) {
       const candidate = candidates.find((c) => c.player.id === playerId);
       if (!candidate) continue;
-      if (candidate.askingFee > context.balance * 0.5) continue;
+      if (candidate.askingFee > context.balance * MAX_FEE_FRACTION) continue;
       return { playerId, offeredFee: candidate.askingFee };
     }
     return null;
