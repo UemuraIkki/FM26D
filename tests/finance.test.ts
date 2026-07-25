@@ -43,6 +43,23 @@ describe("market value (requirement 4.2)", () => {
     expect(contractFactor(0)).toBe(0);
   });
 
+  it("doesn't zero out an active contract just because the winter window crosses into its final calendar year", () => {
+    // A contract "through 2027" still has real registration time left when
+    // evaluated in the January 2027 window (mid-season) — it shouldn't be
+    // priced identically to an actual free agent just because currentYear
+    // caught up to endYear. Regression for a bug where elite players were
+    // observed transferring for a literal £0 fee in winter windows.
+    const world = buildWorld(20260808, [LEAGUE_PATH]);
+    const star = getSquad(world, "LIV")
+      .map((p) => ({ p, a: playerAbility(p) }))
+      .sort((x, y) => y.a - x.a)[0]!;
+    star.p.contract = { annualWage: 10, endYear: 2027 };
+    const summerValue = marketValue(star.p, 2026);
+    const winterValue = marketValue(star.p, 2027);
+    expect(winterValue).toBeGreaterThan(0);
+    expect(winterValue).toBe(summerValue); // same actual contract situation, same value regardless of the calendar-year crossing
+  });
+
   it("values a real generated player plausibly", () => {
     const world = buildWorld(5, [LEAGUE_PATH]);
     const star = getSquad(world, "LIV")

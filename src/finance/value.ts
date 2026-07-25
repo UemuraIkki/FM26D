@@ -46,7 +46,15 @@ export function contractFactor(yearsLeft: number): number {
 
 export function marketValue(player: Player, currentYear: number, leagueCoef = 1.0): number {
   const ability = playerAbility(player);
-  const yearsLeft = player.contract ? Math.max(0, player.contract.endYear - currentYear) : 0;
+  if (!player.contract) return 0; // genuine free agent — no fee, by definition
+  // `endYear` is the season through which the contract runs; subtracting
+  // calendar years alone would wrongly zero out an active contract the
+  // moment the winter window (January) crosses into that same year —
+  // the player hasn't lost any registration time, the calendar just
+  // ticked over mid-season. An active contract is always at least this
+  // season's worth of registration until it actually lapses (processed
+  // at season end by processContractExpiries), so floor at 1.
+  const yearsLeft = Math.max(1, player.contract.endYear - currentYear);
   const value = baseValue(ability) * ageCurve(player.age) * contractFactor(yearsLeft) * leagueCoef;
   return Math.round(value * 100) / 100;
 }
