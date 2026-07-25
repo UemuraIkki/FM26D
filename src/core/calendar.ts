@@ -36,10 +36,6 @@ export function addDays(d: SimDate, days: number): SimDate {
   return fromUtc(toUtc(d) + days * 86_400_000);
 }
 
-export function daysBetween(a: SimDate, b: SimDate): number {
-  return Math.round((toUtc(b) - toUtc(a)) / 86_400_000);
-}
-
 export function compareDates(a: SimDate, b: SimDate): number {
   return toUtc(a) - toUtc(b);
 }

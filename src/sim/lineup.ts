@@ -1,6 +1,5 @@
-import { compareIds } from "../core/rng.js";
 import type { EnginePlayer, TeamSheet } from "../engine/index.js";
-import { getRoleBook, isEligible, roleScore, type Formation, type RoleBook } from "../model/roles.js";
+import { countEligible, getRoleBook, rankEligible, type Formation, type RoleBook } from "../model/roles.js";
 import type { Player } from "../model/types.js";
 
 /**
@@ -39,7 +38,7 @@ export function selectStartingXI(
     for (const slot of open) {
       const role = book.rolesById.get(slot.roleId);
       if (!role) throw new Error(`unknown role in formation: ${slot.roleId}`);
-      const count = squad.filter((p) => !picked.has(p.id) && isEligible(p, role)).length;
+      const count = countEligible(squad, role, picked);
       if (count < chosenCount) {
         chosen = slot;
         chosenCount = count;
@@ -47,11 +46,7 @@ export function selectStartingXI(
     }
     const slot = chosen!;
     const role = book.rolesById.get(slot.roleId)!;
-    const candidates = squad
-      .filter((p) => !picked.has(p.id) && isEligible(p, role))
-      .map((player) => ({ player, score: roleScore(player, role) }))
-      .sort((a, b) => b.score - a.score || compareIds(a.player.id, b.player.id));
-    const best = candidates[0];
+    const best = rankEligible(squad, role, picked)[0];
     if (!best) throw new Error(`club ${clubId}: no eligible player for role ${slot.roleId}`);
     picked.add(best.player.id);
     slot.player = best.player;

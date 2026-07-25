@@ -1,6 +1,6 @@
 import { compareIds } from "../core/rng.js";
 import type { Player } from "../model/types.js";
-import { isEligible, roleScore, type Formation, type RoleBook } from "../model/roles.js";
+import { countEligible, rankEligible, type Formation, type RoleBook } from "../model/roles.js";
 
 /**
  * Depth chart (requirement 4.2): per formation role, rank eligible players
@@ -63,17 +63,13 @@ function draftRound(
     open.sort((a, b) => {
       const roleA = book.rolesById.get(a.role.roleId)!;
       const roleB = book.rolesById.get(b.role.roleId)!;
-      const candA = squad.filter((p) => !assignedIds.has(p.id) && isEligible(p, roleA)).length;
-      const candB = squad.filter((p) => !assignedIds.has(p.id) && isEligible(p, roleB)).length;
+      const candA = countEligible(squad, roleA, assignedIds);
+      const candB = countEligible(squad, roleB, assignedIds);
       return candA / a.toFill - candB / b.toFill || compareIds(a.role.roleId, b.role.roleId);
     });
     const current = open[0]!;
     const role = book.rolesById.get(current.role.roleId)!;
-    const candidates = squad
-      .filter((p) => !assignedIds.has(p.id) && isEligible(p, role))
-      .map((player) => ({ player, score: roleScore(player, role) }))
-      .sort((a, b) => b.score - a.score || compareIds(a.player.id, b.player.id));
-    const best = candidates[0];
+    const best = rankEligible(squad, role, assignedIds)[0];
     current.toFill--;
     if (!best) continue; // shortage — leave the slot unfilled
     assignedIds.add(best.player.id);
@@ -121,10 +117,7 @@ export function buildDepthChart(
 
   const roles: RoleDepth[] = draftRoles.map((dr) => {
     const role = book.rolesById.get(dr.roleId)!;
-    const depth = squad
-      .filter((p) => isEligible(p, role))
-      .map((player) => ({ player, score: roleScore(player, role) }))
-      .sort((a, b) => b.score - a.score || compareIds(a.player.id, b.player.id));
+    const depth = rankEligible(squad, role);
     const required = dr.slots * 2;
     return {
       roleId: dr.roleId,

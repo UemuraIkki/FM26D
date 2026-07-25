@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { compareIds } from "../core/rng.js";
 import type { Player, PlayerAttributes, Position } from "./types.js";
 
 /**
@@ -91,6 +92,31 @@ export function roleScore(player: Player, role: Role): number {
 
 export function isEligible(player: Player, role: Role): boolean {
   return role.positions.includes(player.position);
+}
+
+/** Count of squad members eligible for `role`, excluding already-taken ids (scarcity-order slot filling). */
+export function countEligible(
+  squad: readonly Player[],
+  role: Role,
+  excluded: ReadonlySet<string> = new Set(),
+): number {
+  let count = 0;
+  for (const p of squad) {
+    if (!excluded.has(p.id) && isEligible(p, role)) count++;
+  }
+  return count;
+}
+
+/** Squad members eligible for `role`, excluding already-taken ids, ranked best score first (compareIds tie-break). */
+export function rankEligible(
+  squad: readonly Player[],
+  role: Role,
+  excluded: ReadonlySet<string> = new Set(),
+): Array<{ player: Player; score: number }> {
+  return squad
+    .filter((p) => !excluded.has(p.id) && isEligible(p, role))
+    .map((player) => ({ player, score: roleScore(player, role) }))
+    .sort((a, b) => b.score - a.score || compareIds(a.player.id, b.player.id));
 }
 
 /**

@@ -39,13 +39,6 @@ export interface PlayerAgent {
   decide(proposal: MoveProposal): MoveDecision;
 }
 
-/** Phase C behaviour, kept for tests and pure-market experiments. */
-export class AlwaysAcceptAgent implements PlayerAgent {
-  decide(): MoveDecision {
-    return { accept: true };
-  }
-}
-
 const PLAY_SCORE: Record<SquadRank, number> = { STARTER: 2, BACKUP: 1, OUT: 0 };
 const ACCEPT_THRESHOLD = 0.15;
 

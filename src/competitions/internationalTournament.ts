@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { addDays, toIso, type SimDate } from "../core/calendar.js";
 import { compareIds, deriveRng } from "../core/rng.js";
+import { applyGroupResult, shuffle, sortGroupTable, type GroupRow } from "./groupStage.js";
 import { applyFitnessToSheet, applyMatchFitnessCost } from "../model/fitness.js";
 import { callUpSquad, nationStrength, recordCaps } from "../model/nationalTeam.js";
 import { generateSquad } from "../model/playerGen.js";
@@ -57,13 +58,6 @@ export interface TournamentReport {
   finalists?: [string, string];
   matches: TournamentMatch[];
   injuries: number;
-}
-
-interface GroupRow {
-  id: string;
-  points: number;
-  gf: number;
-  ga: number;
 }
 
 const CONFIG_PATH: Record<TournamentKind, string> = {
@@ -169,10 +163,7 @@ export class InternationalTournament {
     this.groups = Array.from({ length: groupCount }, () => []);
     for (let pot = 0; pot < groupSize; pot++) {
       const potEntrants = sorted.slice(pot * groupCount, pot * groupCount + groupCount);
-      for (let i = potEntrants.length - 1; i > 0; i--) {
-        const j = rng.int(0, i);
-        [potEntrants[i], potEntrants[j]] = [potEntrants[j]!, potEntrants[i]!];
-      }
+      shuffle(rng, potEntrants);
       potEntrants.forEach((entrant, g) => this.groups[g]!.push(entrant.id));
     }
     this.groups.forEach((group, g) =>
@@ -249,18 +240,7 @@ export class InternationalTournament {
 
     if (match.stage === "GROUP") {
       const table = this.groupTables.get(match.group!)!;
-      const homeRow = table.find((r) => r.id === match.homeId)!;
-      const awayRow = table.find((r) => r.id === match.awayId)!;
-      homeRow.gf += result.homeGoals;
-      homeRow.ga += result.awayGoals;
-      awayRow.gf += result.awayGoals;
-      awayRow.ga += result.homeGoals;
-      if (result.homeGoals > result.awayGoals) homeRow.points += 3;
-      else if (result.homeGoals < result.awayGoals) awayRow.points += 3;
-      else {
-        homeRow.points++;
-        awayRow.points++;
-      }
+      applyGroupResult(table, match.homeId, match.awayId, result.homeGoals, result.awayGoals);
     } else {
       if (result.homeGoals === result.awayGoals) {
         const strengthOf = (id: string): number => this.entrants.find((e) => e.id === id)?.strength ?? 65;
@@ -277,10 +257,7 @@ export class InternationalTournament {
   private scheduleKnockoutRound(stage: "R16" | "QF" | "SF" | "FINAL", entrantIds: string[], date: SimDate): void {
     const rng = deriveRng(this.world.seed, `${this.kind}:${this.startYear}:${stage}`);
     const order = [...entrantIds];
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = rng.int(0, i);
-      [order[i], order[j]] = [order[j]!, order[i]!];
-    }
+    shuffle(rng, order);
     for (let i = 0; i < order.length; i += 2) {
       this.addMatch({
         id: `${this.config.id}-${this.startYear}-${stage}-${i / 2 + 1}`,
@@ -302,9 +279,7 @@ export class InternationalTournament {
     if (iso === toIso(this.groupEndTrigger)) {
       const qualified: string[] = [];
       for (let g = 0; g < this.config.groupCount; g++) {
-        const table = [...this.groupTables.get(g)!].sort(
-          (a, b) => b.points - a.points || b.gf - b.ga - (a.gf - a.ga) || b.gf - a.gf || compareIds(a.id, b.id),
-        );
+        const table = sortGroupTable(this.groupTables.get(g)!);
         qualified.push(table[0]!.id, table[1]!.id);
       }
       this.scheduleKnockoutRound("R16", qualified, this.r16Date);

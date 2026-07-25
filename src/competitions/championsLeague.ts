@@ -5,6 +5,7 @@ import { compareIds, deriveRng } from "../core/rng.js";
 import type { ClubDecisionMaker } from "../decision/clubDecisionMaker.js";
 import { simulateMatch, type EngineParams, type MatchResult, type TeamSheet } from "../engine/index.js";
 import { WORLD_ACCOUNT } from "../finance/ledger.js";
+import { applyGroupResult, shuffle, sortGroupTable, type GroupRow } from "./groupStage.js";
 import { applyMatchMorale, applyMoraleToSheet } from "../morale/morale.js";
 import { applyFitnessToSheet, applyMatchFitnessCost, availableSquad } from "../model/fitness.js";
 import type { RoleBook } from "../model/roles.js";
@@ -74,13 +75,6 @@ interface Entrant {
   real: boolean;
 }
 
-interface GroupRow {
-  id: string;
-  points: number;
-  gf: number;
-  ga: number;
-}
-
 export class ChampionsLeague {
   private config: CLConfig;
   private entrants: Entrant[] = [];
@@ -147,10 +141,7 @@ export class ChampionsLeague {
     this.groups = Array.from({ length: 8 }, () => []);
     for (let pot = 0; pot < 4; pot++) {
       const potClubs = sorted.slice(pot * 8, pot * 8 + 8);
-      for (let i = potClubs.length - 1; i > 0; i--) {
-        const j = rng.int(0, i);
-        [potClubs[i], potClubs[j]] = [potClubs[j]!, potClubs[i]!];
-      }
+      shuffle(rng, potClubs);
       potClubs.forEach((club, g) => this.groups[g]!.push(club.id));
     }
     this.groups.forEach((group, g) =>
@@ -248,25 +239,10 @@ export class ChampionsLeague {
 
     if (match.stage === "GROUP") {
       const table = this.groupTables.get(match.group!)!;
-      const homeRow = table.find((r) => r.id === match.homeId)!;
-      const awayRow = table.find((r) => r.id === match.awayId)!;
-      homeRow.gf += result.homeGoals;
-      homeRow.ga += result.awayGoals;
-      awayRow.gf += result.awayGoals;
-      awayRow.ga += result.homeGoals;
-      if (result.homeGoals > result.awayGoals) {
-        homeRow.points += 3;
-        if (this.world.clubsById.has(match.homeId)) {
-          this.world.ledger.record(match.date, "MERIT", WORLD_ACCOUNT, match.homeId, this.config.prizes.groupWin, "UCL group win");
-        }
-      } else if (result.homeGoals < result.awayGoals) {
-        awayRow.points += 3;
-        if (this.world.clubsById.has(match.awayId)) {
-          this.world.ledger.record(match.date, "MERIT", WORLD_ACCOUNT, match.awayId, this.config.prizes.groupWin, "UCL group win");
-        }
-      } else {
-        homeRow.points++;
-        awayRow.points++;
+      const outcome = applyGroupResult(table, match.homeId, match.awayId, result.homeGoals, result.awayGoals);
+      const winnerId = outcome === "HOME" ? match.homeId : outcome === "AWAY" ? match.awayId : null;
+      if (winnerId && this.world.clubsById.has(winnerId)) {
+        this.world.ledger.record(match.date, "MERIT", WORLD_ACCOUNT, winnerId, this.config.prizes.groupWin, "UCL group win");
       }
     } else {
       // Single-leg knockout: level ties go to "penalties" (seeded coin with a
@@ -294,10 +270,7 @@ export class ChampionsLeague {
   ): void {
     const rng = deriveRng(this.world.seed, `cl:${this.startYear}:${stage}`);
     const order = [...entrantIds];
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = rng.int(0, i);
-      [order[i], order[j]] = [order[j]!, order[i]!];
-    }
+    shuffle(rng, order);
     for (let i = 0; i < order.length; i += 2) {
       this.addMatch({
         id: `CL-${this.startYear}-${stage}-${i / 2 + 1}`,
@@ -326,9 +299,7 @@ export class ChampionsLeague {
     if (iso === toIso(this.groupStageEndTrigger())) {
       const qualified: string[] = [];
       for (let g = 0; g < 8; g++) {
-        const table = [...this.groupTables.get(g)!].sort(
-          (a, b) => b.points - a.points || b.gf - b.ga - (a.gf - a.ga) || b.gf - a.gf || compareIds(a.id, b.id),
-        );
+        const table = sortGroupTable(this.groupTables.get(g)!);
         qualified.push(table[0]!.id, table[1]!.id);
       }
       this.scheduleKnockoutRound("R16", qualified, nextWeekday({ year: this.startYear + 1, month: 2, day: 14 }, 2), this.config.prizes.roundOf16);
